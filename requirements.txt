@@ -1,0 +1,48 @@
+# ============================================================
+# AI Agent Microservices — Python dependencies
+# ============================================================
+
+# Web framework & async
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+httpx==0.27.0
+aiohttp==3.9.5
+
+# LLM providers
+openai==1.30.1          # OpenRouter + OpenAI-compatible APIs
+groq==0.9.0             # Groq (fast Llama/Mixtral inference)
+google-generativeai==0.7.0  # Gemini
+
+# Redis (async)
+redis[hiredis]==5.0.6
+
+# Neo4j & Graphiti (optional — for graph-structured memory)
+neo4j==5.24.0
+graphiti-core==0.3.13
+
+# Postgres
+psycopg2-binary==2.9.9
+SQLAlchemy==2.0.30
+
+# Scheduling
+APScheduler==3.10.4
+
+# Settings & validation
+pydantic-settings==2.2.1
+python-dotenv==1.0.1
+
+# Web browsing / scraping
+beautifulsoup4==4.12.3
+lxml==5.2.2
+
+# Email
+aiosmtplib==3.0.1
+
+# Utilities
+tenacity==8.3.0         # Retry logic for LLM calls
+python-json-logger==2.0.7
+
+# Dev / testing (not installed in prod — optional)
+# pytest==8.2.0
+# pytest-asyncio==0.23.7
+# httpx[testing]

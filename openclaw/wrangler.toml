@@ -1,0 +1,12 @@
+name = "openclaw-ai-agent-team"
+main = "src/index.ts"
+compatibility_date = "2024-06-15"
+
+[vars]
+BACKEND_URL = "http://localhost:8000"
+TEAMS_WEBHOOK_URL = ""
+
+# Production routes — replace with your actual domain
+[[routes]]
+pattern = "openclaw.yourdomain.com/*"
+zone_name = "yourdomain.com"

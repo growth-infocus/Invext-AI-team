@@ -1,0 +1,240 @@
+version: "3.9"
+
+# ============================================================
+# AI Agent Team — True Microservices Architecture
+# 15 services: redis, postgres, neo4j (optional), gateway,
+#              manager, developer, devops, qa, support, docs,
+#              design, ux, ui_test, api_test, qa_auto, security
+# ============================================================
+
+x-agent-base: &agent-base
+  build:
+    context: .
+    dockerfile: Dockerfile
+  env_file: .env
+  volumes:
+    - reports_vol:/app/reports
+    - sandbox_vol:/app/sandbox
+    - obsidian_vault:/app/obsidian_vault
+  depends_on:
+    redis:
+      condition: service_healthy
+    postgres:
+      condition: service_healthy
+  restart: unless-stopped
+  networks:
+    - agent-net
+  environment:
+    OBSIDIAN_VAULT_PATH: /app/obsidian_vault
+
+services:
+
+  # ─────────────────────────────────────────────
+  # Infrastructure
+  # ─────────────────────────────────────────────
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_vol:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - agent-net
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: agentuser
+      POSTGRES_PASSWORD: agentpass
+      POSTGRES_DB: agentdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_vol:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentuser -d agentdb"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+    restart: unless-stopped
+    networks:
+      - agent-net
+
+  # ─────────────────────────────────────────────
+  # Neo4j (optional — for Graphiti memory)
+  # Uncomment to enable graph-structured memory
+  # ─────────────────────────────────────────────
+  # neo4j:
+  #   image: neo4j:5-alpine
+  #   environment:
+  #     NEO4J_AUTH: neo4j/password
+  #     NEO4J_INITIAL_ADMIN_PASSWORD: password
+  #   ports:
+  #     - "7687:7687"  # Bolt protocol
+  #     - "7474:7474"  # HTTP console
+  #   volumes:
+  #     - neo4j_vol:/var/lib/neo4j/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "cypher-shell -u neo4j -p password 'RETURN 1'"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 10
+  #   restart: unless-stopped
+  #   networks:
+  #     - agent-net
+
+  # ─────────────────────────────────────────────
+  # API Gateway  (single entry point — port 8000)
+  # ─────────────────────────────────────────────
+
+  gateway:
+    <<: *agent-base
+    command: uvicorn services.gateway.main:app --host 0.0.0.0 --port 8000 --workers 1
+    ports:
+      - "8000:8000"
+    environment:
+      SERVICE_ROLE: gateway
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  # ─────────────────────────────────────────────
+  # Agent Services
+  # ─────────────────────────────────────────────
+
+  manager:
+    <<: *agent-base
+    command: uvicorn services.manager.main:app --host 0.0.0.0 --port 8001 --workers 1
+    ports:
+      - "8001:8001"
+    environment:
+      SERVICE_ROLE: manager
+
+  developer:
+    <<: *agent-base
+    command: uvicorn services.developer.main:app --host 0.0.0.0 --port 8002 --workers 1
+    ports:
+      - "8002:8002"
+    environment:
+      SERVICE_ROLE: developer
+
+  devops:
+    <<: *agent-base
+    command: uvicorn services.devops.main:app --host 0.0.0.0 --port 8003 --workers 1
+    ports:
+      - "8003:8003"
+    environment:
+      SERVICE_ROLE: devops
+
+  qa:
+    <<: *agent-base
+    command: uvicorn services.qa.main:app --host 0.0.0.0 --port 8004 --workers 1
+    ports:
+      - "8004:8004"
+    environment:
+      SERVICE_ROLE: qa
+
+  support:
+    <<: *agent-base
+    command: uvicorn services.support.main:app --host 0.0.0.0 --port 8005 --workers 1
+    ports:
+      - "8005:8005"
+    environment:
+      SERVICE_ROLE: support
+
+  docs:
+    <<: *agent-base
+    command: uvicorn services.docs.main:app --host 0.0.0.0 --port 8006 --workers 1
+    ports:
+      - "8006:8006"
+    environment:
+      SERVICE_ROLE: docs
+
+  design:
+    <<: *agent-base
+    command: uvicorn services.design.main:app --host 0.0.0.0 --port 8007 --workers 1
+    ports:
+      - "8007:8007"
+    environment:
+      SERVICE_ROLE: design
+
+  ux:
+    <<: *agent-base
+    command: uvicorn services.ux.main:app --host 0.0.0.0 --port 8008 --workers 1
+    ports:
+      - "8008:8008"
+    environment:
+      SERVICE_ROLE: ux
+
+  ui_test:
+    <<: *agent-base
+    command: uvicorn services.ui_test.main:app --host 0.0.0.0 --port 8009 --workers 1
+    ports:
+      - "8009:8009"
+    environment:
+      SERVICE_ROLE: ui_test
+
+  api_test:
+    <<: *agent-base
+    command: uvicorn services.api_test.main:app --host 0.0.0.0 --port 8010 --workers 1
+    ports:
+      - "8010:8010"
+    environment:
+      SERVICE_ROLE: api_test
+
+  qa_auto:
+    <<: *agent-base
+    command: uvicorn services.qa_auto.main:app --host 0.0.0.0 --port 8011 --workers 1
+    ports:
+      - "8011:8011"
+    environment:
+      SERVICE_ROLE: qa_auto
+
+  security:
+    <<: *agent-base
+    command: uvicorn services.security.main:app --host 0.0.0.0 --port 8012 --workers 1
+    ports:
+      - "8012:8012"
+    environment:
+      SERVICE_ROLE: security
+
+  # ─────────────────────────────────────────────
+  # Dashboard (static HTML served by nginx)
+  # ─────────────────────────────────────────────
+
+  dashboard:
+    image: nginx:alpine
+    ports:
+      - "3000:80"
+    volumes:
+      - ./dashboard:/usr/share/nginx/html:ro
+    restart: unless-stopped
+    networks:
+      - agent-net
+
+# ─────────────────────────────────────────────
+# Volumes & Networks
+# ─────────────────────────────────────────────
+
+volumes:
+  redis_vol:
+  postgres_vol:
+  reports_vol:
+  sandbox_vol:
+  obsidian_vault:
+  # neo4j_vol:  # Uncomment when enabling Neo4j service
+
+networks:
+  agent-net:
+    driver: bridge

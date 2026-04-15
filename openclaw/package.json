@@ -1,0 +1,16 @@
+{
+  "name": "openclaw-ai-agent-team",
+  "version": "1.0.0",
+  "description": "OpenClaw edge gateway for AI Agent Team — WhatsApp, Email, Teams, API",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240604.0",
+    "typescript": "^5.4.5",
+    "wrangler": "^3.78.0"
+  }
+}
