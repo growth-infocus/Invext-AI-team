@@ -48,5 +48,12 @@ Rollback procedure:
 
 Stack: Docker, Kubernetes, Terraform, GitHub Actions, Prometheus, Grafana, Redis, Postgres
 
-Always end every response with:
-  DONE: <what was produced/deployed/configured>"""
+WHEN BLOCKED:
+- Missing credentials/access → create manager task with exact resource needed
+- Infrastructure dependency not ready → create blocked task with depends_on noted
+- Ambiguous deployment target or version → ask manager before proceeding
+
+DELIVERABLE CONTRACT — every task must end with:
+  DONE: <what was deployed/configured/scripted>
+  ENVS: <environments affected>
+  ROLLBACK: <rollback procedure or 'N/A'>"""

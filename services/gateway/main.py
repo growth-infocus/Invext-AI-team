@@ -2,14 +2,18 @@
 services/gateway/main.py — API Gateway (port 8000)
 Single entry point for humans, the product, and external apps.
 """
-import asyncio, logging
+import asyncio
+import logging
+import os
+import shutil
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException
+from pathlib import Path
+from typing import Literal, Optional, List
+
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pathlib import Path
 from pydantic import BaseModel
-from typing import Literal, Optional, List
 
 from shared.obsidian_export.exporter import export_from_redis_memory
 from shared.core.database import (
@@ -75,6 +79,14 @@ async def _proxy_patch(service: str, path: str, json: dict = None):
         raise HTTPException(r.status_code, r.text)
     return r.json()
 
+async def _proxy_delete(service: str, path: str):
+    url = SERVICES[service] + path
+    async with httpx.AsyncClient(timeout=30) as c:
+        r = await c.delete(url)
+    if r.status_code >= 400:
+        raise HTTPException(r.status_code, r.text)
+    return r.json()
+
 
 # ── Dashboard ─────────────────────────────────────────────────────────────────
 
@@ -100,9 +112,185 @@ class IssueRequest(BaseModel):
     ticket_type: str = "Support"
 
 
-@app.post("/goal", summary="Give the team a goal to plan and execute")
+@app.post("/goal", summary="Give the team a goal to plan and execute (rapid, no approval)")
 async def goal(req: GoalRequest):
     return await _proxy("manager", "/goal", "POST", {"goal": req.goal})
+
+
+@app.post("/goal/upload",
+          summary="Submit a goal with attached files, images, or links for context")
+async def goal_with_upload(
+    goal: str = Form(..., description="The goal or project description"),
+    links: str = Form("", description="Comma-separated URLs for context (GitHub, docs, prod URL, etc.)"),
+    files: List[UploadFile] = File(default=[], description="Files/images to include as context"),
+):
+    """
+    Rich goal submission. Attach:
+      - Files: requirements docs, architecture diagrams, screenshots, CSVs, code files
+      - Images: UI mockups, wireframes, error screenshots
+      - Links: GitHub repo URL, production URL, Notion doc, Jira epic, Figma file, etc.
+
+    All attachments are saved to /app/sandbox/uploads/ and referenced in the goal context
+    sent to the manager.
+    """
+    upload_dir = Path("/app/sandbox/uploads")
+    upload_dir.mkdir(parents=True, exist_ok=True)
+
+    saved_files = []
+    context_parts = [f"GOAL:\n{goal}"]
+
+    # Save uploaded files
+    for f in files:
+        if f.filename:
+            dest = upload_dir / f.filename
+            with dest.open("wb") as out:
+                shutil.copyfileobj(f.file, out)
+            saved_files.append(str(dest))
+            size_kb = dest.stat().st_size // 1024
+            context_parts.append(f"ATTACHED FILE: {dest} ({size_kb}KB)")
+
+    # Include links
+    raw_links = [l.strip() for l in links.split(",") if l.strip()]
+    for link in raw_links:
+        context_parts.append(f"REFERENCE LINK: {link}")
+
+    enriched_goal = "\n\n".join(context_parts)
+
+    return await _proxy("manager", "/goal", "POST", {"goal": enriched_goal})
+
+
+# ── Expert planning workflow ──────────────────────────────────────────────────
+
+class PlanCreateRequest(BaseModel):
+    goal: str
+    project_source: Optional[str] = None  # local path, GitHub URL, or production URL
+
+class PlanApproveRequest(BaseModel):
+    action: str             # approve | reject | revise
+    feedback: Optional[str] = None
+
+
+@app.post("/plan/create", summary="Phase 1: Manager generates a full project plan for review")
+async def plan_create(req: PlanCreateRequest):
+    """
+    Pass a goal and optional project source (local path / GitHub URL / production URL).
+    Returns a complete, phased project plan. No tickets are created yet.
+    Approve or revise with POST /plan/{plan_id}/approve.
+    """
+    return await _proxy("manager", "/plan/create", "POST", req.dict())
+
+
+@app.post("/plan/create/upload",
+          summary="Create a plan with attached files, images, or links as context")
+async def plan_create_with_upload(
+    goal: str = Form(...),
+    project_source: str = Form("", description="GitHub URL, production URL, or local path"),
+    links: str = Form("", description="Comma-separated reference URLs"),
+    files: List[UploadFile] = File(default=[]),
+):
+    """
+    Rich plan creation. Attach requirements docs, wireframes, screenshots, architecture diagrams.
+    All files saved to /app/sandbox/uploads/ and referenced in the goal.
+    """
+    upload_dir = Path("/app/sandbox/uploads")
+    upload_dir.mkdir(parents=True, exist_ok=True)
+
+    context_parts = []
+    for f in files:
+        if f.filename:
+            dest = upload_dir / f.filename
+            with dest.open("wb") as out:
+                shutil.copyfileobj(f.file, out)
+            context_parts.append(f"ATTACHED FILE: {dest}")
+
+    for link in [l.strip() for l in links.split(",") if l.strip()]:
+        context_parts.append(f"REFERENCE: {link}")
+
+    enriched_goal = goal
+    if context_parts:
+        enriched_goal += "\n\n" + "\n".join(context_parts)
+
+    # If project_source not given but a GitHub/prod link was provided, use it
+    effective_source = project_source.strip() or None
+    if not effective_source:
+        for link in [l.strip() for l in links.split(",") if l.strip()]:
+            if link.startswith("http"):
+                effective_source = link
+                break
+
+    return await _proxy("manager", "/plan/create", "POST", {
+        "goal": enriched_goal,
+        "project_source": effective_source,
+    })
+
+
+@app.get("/plan/{plan_id}", summary="Get a specific plan")
+async def plan_get(plan_id: str):
+    return await _proxy("manager", f"/plan/{plan_id}")
+
+
+@app.get("/plans", summary="List all project plans")
+async def plans_list(status: Optional[str] = None, limit: int = 20):
+    url = f"/plans?limit={limit}"
+    if status:
+        url += f"&status={status}"
+    return await _proxy("manager", url)
+
+
+@app.post("/plan/{plan_id}/approve", summary="Phase 2: Approve, reject, or revise a plan")
+async def plan_approve(plan_id: str, req: PlanApproveRequest):
+    """
+    action='approve' — creates all tickets and assigns to agents
+    action='reject'  — marks plan as rejected
+    action='revise'  — re-runs planning with your feedback
+    """
+    return await _proxy("manager", f"/plan/{plan_id}/approve", "POST", req.dict())
+
+
+@app.delete("/plan/{plan_id}", summary="Delete a plan")
+async def plan_delete(plan_id: str):
+    return await _proxy_delete("manager", f"/plan/{plan_id}")
+
+
+# ── Employee work-plan review ─────────────────────────────────────────────────
+
+class WorkplanReviewRequest(BaseModel):
+    action:   str             # approve | reject
+    feedback: Optional[str] = ""
+
+
+@app.get("/workplans",
+         summary="List all employee work plans awaiting manager review")
+async def workplans_pending():
+    """
+    Shows all agent work plans with status=pending_manager_review.
+    Review each one and call POST /workplans/{role}/{task_id}/review to approve or reject.
+    """
+    return await _proxy("manager", "/workplans")
+
+
+@app.get("/workplans/all", summary="List all employee work plans (any status)")
+async def workplans_all(status: Optional[str] = None):
+    url = "/workplans/all"
+    if status:
+        url += f"?status={status}"
+    return await _proxy("manager", url)
+
+
+@app.get("/workplans/{role}/{task_id}", summary="Get a specific agent work plan")
+async def workplan_get(role: str, task_id: str):
+    return await _proxy("manager", f"/workplans/{role}/{task_id}")
+
+
+@app.post("/workplans/{role}/{task_id}/review",
+          summary="Approve or reject an agent's work plan before they start executing")
+async def workplan_review(role: str, task_id: str, req: WorkplanReviewRequest):
+    """
+    action='approve' → agent proceeds with execution
+    action='reject'  → agent is blocked; use feedback to explain what to change
+    """
+    return await _proxy("manager", f"/workplans/{role}/{task_id}/review", "POST", req.dict())
+
 
 @app.post("/ask/{role}", summary="Ask any agent a direct question")
 async def ask(role: ALL_ROLES, req: AskRequest):
@@ -129,11 +317,11 @@ async def health():
         for role, url in SERVICES.items():
             try:
                 r = await c.get(url + "/health")
-                results[role] = "ok" if r.status_code == 200 else f"error:{r.status_code}"
+                status = "ok" if r.status_code == 200 else f"error:{r.status_code}"
             except Exception as e:
-                results[role] = f"down:{e}"
-    overall = "ok" if all(v == "ok" for v in results.values()) else "degraded"
-    return {"overall": overall, "services": results}
+                status = f"down:{e}"
+            results[role] = {"status": status}
+    return results
 
 
 # ── Tickets ───────────────────────────────────────────────────────────────────

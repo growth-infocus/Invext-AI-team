@@ -3,22 +3,36 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    # ── Service identity (set per-container via docker-compose env) ──────────
-    service_role: str = "unknown"      # manager | developer | devops | qa | support | docs
+    # ── Service identity ──────────────────────────────────────────────────────
+    service_role: str = "unknown"
     service_port: int = 8000
 
-    # ── LLM providers ────────────────────────────────────────────────────────
-    openrouter_api_key:    str = ""
-    openrouter_base_url:   str = "https://openrouter.ai/api/v1"
-    openrouter_default_model: str = "meta-llama/llama-3.2-3b-instruct:free"
+    # ── OpenAI ────────────────────────────────────────────────────────────────
+    openai_api_key:       str = ""
+    openai_default_model: str = "gpt-4o-mini"
 
-    groq_api_key:          str = ""
-    groq_default_model:    str = "llama-3.2-3b-preview"
+    # ── OpenRouter ────────────────────────────────────────────────────────────
+    openrouter_api_key:           str = ""
+    openrouter_base_url:          str = "https://openrouter.ai/api/v1"
+    openrouter_default_model:     str = "meta-llama/llama-3.1-8b-instruct:free"
+    openrouter_model:             str = ""   # legacy alias
 
-    gemini_api_key:        str = ""
-    gemini_default_model:  str = "gemini-1.5-flash"
+    # ── Groq ──────────────────────────────────────────────────────────────────
+    groq_api_key:         str = ""
+    groq_default_model:   str = "llama-3.1-8b-instant"
+    groq_tool_model:      str = "meta-llama/llama-4-scout-17b-16e-instruct"
+    groq_model:           str = ""   # legacy alias
 
-    # Per-role LLM routing (set in docker-compose or .env)
+    # ── Gemini ────────────────────────────────────────────────────────────────
+    gemini_api_key:       str = ""
+    gemini_default_model: str = "gemini-1.5-flash"
+    gemini_model:         str = ""   # legacy alias
+
+    # ── HuggingFace ───────────────────────────────────────────────────────────
+    huggingface_api_key:  str = ""
+    huggingface_model:    str = "mistralai/Mixtral-8x7B-Instruct-v0.1"
+
+    # ── Per-role LLM routing ──────────────────────────────────────────────────
     manager_provider:    str = "openrouter"
     developer_provider:  str = "groq"
     devops_provider:     str = "groq"
@@ -44,21 +58,23 @@ class Settings(BaseSettings):
     smtp_user:     str = ""
     smtp_password: str = ""
     notify_email:  str = ""
+    email_from:    str = ""
+    email_to:      str = ""
 
-    # ── Microsoft Teams Integration ────────────────────────────────────────────
-    teams_webhook_url: str = ""    # Incoming Webhook URL
-    meeting_channel:   str = ""    # Teams channel name for meeting notifications
+    # ── Microsoft Teams ───────────────────────────────────────────────────────
+    teams_webhook_url: str = ""
+    meeting_channel:   str = ""
 
     # ── Web Search ────────────────────────────────────────────────────────────
     serper_api_key: str = ""
 
-    # ── Neo4j / Graphiti (optional) ──────────────────────────────────────────
-    neo4j_uri: str = "bolt://neo4j:7687"
-    neo4j_user: str = "neo4j"
-    neo4j_password: str = "password"
+    # ── Neo4j / Graphiti ──────────────────────────────────────────────────────
+    neo4j_uri:      str  = "bolt://neo4j:7687"
+    neo4j_user:     str  = "neo4j"
+    neo4j_password: str  = "password"
     use_graphiti_memory: bool = False
 
-    # ── Jira MCP Integration (optional) ──────────────────────────────────────
+    # ── Jira MCP ──────────────────────────────────────────────────────────────
     jira_mcp_enabled:  bool = False
     jira_mcp_url:      str  = "http://localhost:8020"
     jira_project_key:  str  = "PROD"
@@ -68,16 +84,55 @@ class Settings(BaseSettings):
 
     # ── DevOps ────────────────────────────────────────────────────────────────
     deploy_notification_enabled: bool = True
-    github_webhook_secret: str = ""
-    github_repo: str = ""
+    github_webhook_secret:       str  = ""
+    github_repo:                 str  = ""
 
     # ── Paths ─────────────────────────────────────────────────────────────────
-    reports_dir: str = "/app/reports"
-    obsidian_vault_path: str = "./obsidian_vault"
+    reports_dir:          str = "/app/reports"
+    obsidian_vault_path:  str = "./obsidian_vault"
+    sandbox_dir:          str = "/app/sandbox"
+    sandbox_timeout_seconds: int = 30
+
+    # ── Scheduler ─────────────────────────────────────────────────────────────
+    scheduler_enabled:           bool = True
+    daily_plan_cron:             str  = "0 9 * * *"
+    delegation_interval_minutes: int  = 30
+    daily_report_cron:           str  = "0 17 * * *"
+    weekly_report_cron:          str  = "0 8 * * 1"
+
+    # ── Expert Planning System ────────────────────────────────────────────────
+    # Phase 1 (manager): project plan requires human approval before tickets are created
+    planning_require_approval:       bool  = True
+
+    # Include a dedicated security review phase in every project plan
+    planning_include_security_phase: bool  = True
+
+    # Include UI/UX design phase before frontend development
+    planning_include_ux_phase:       bool  = True
+
+    # Length of a sprint in calendar days (used for timeline calculations)
+    planning_sprint_days:            int   = 14
+
+    # Default priority assigned to tasks created from plans
+    planning_default_priority:       str   = "P2"
+
+    # Fraction of capacity to allocate per sprint (0.7 = 70%; rest = meetings/reviews)
+    planning_team_capacity_factor:   float = 0.7
+
+    # Agent work-plan: each agent submits a work plan before executing a task
+    # Manager must approve it (or auto-approve if False)
+    agent_workplan_require_approval: bool  = True
+
+    # Max steps in a single ReAct loop per agent
+    agent_max_react_steps:           int   = 15
+
+    # ── Security ─────────────────────────────────────────────────────────────
+    api_secret_key: str = ""
 
     class Config:
         env_file = ".env"
         case_sensitive = False
+        extra = "ignore"
 
 
 settings = Settings()

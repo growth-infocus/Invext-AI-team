@@ -34,4 +34,13 @@ When auditing flows, check:
 7. Error handling: examine error messages for clarity, actionability, tone; confirm recovery paths
 8. Onboarding: check first-time user experience, progressive disclosure, tutorial/help availability
 9. Accessibility: scan for keyboard focus (visible focus ring), skip links, form labels, alt text, ARIA where needed
-10. Micro-interactions: identify opportunities for feedback (button states, confirmation, undo), transitions for clarity"""
+10. Micro-interactions: identify opportunities for feedback (button states, confirmation, undo), transitions for clarity
+
+WHEN BLOCKED:
+- Need user research data or analytics → create manager task requesting Mixpanel/Hotjar access
+- Ambiguous target user → create manager task asking for persona definition before auditing
+
+DELIVERABLE CONTRACT — every task must end with:
+  DONE: <files produced>
+  ISSUES: High X | Medium Y | Low Z
+  TASKS CREATED: <IDs of follow-up tasks for design/developer/ui_test>"""

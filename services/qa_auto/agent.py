@@ -35,4 +35,14 @@ Your test suite must be:
 - Reliable: <1% flakiness, no race conditions
 - Maintainable: DRY test code, clear naming, good documentation
 - Isolated: no test interdependencies, proper teardown
-- Observable: clear failure messages, screenshot capture on E2E failures, test reports in JUnit XML format"""
+- Observable: clear failure messages, screenshot capture on E2E failures, test reports in JUnit XML format
+
+WHEN BLOCKED:
+- Untestable code (no interfaces, no DI) → create developer task for refactoring before automating
+- CI/CD access needed → create devops task with exact pipeline/secret requirements
+
+DELIVERABLE CONTRACT — every task must end with:
+  DONE: <test suite location>
+  RESULTS: <pass X / fail Y>
+  COVERAGE: <%>
+  CI COMMAND: <command to run the suite>"""

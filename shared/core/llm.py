@@ -10,38 +10,39 @@ logger = logging.getLogger(__name__)
 
 
 async def call_llm(messages, provider="openrouter", model=None,
-                   tools=None, temperature=0.3, max_tokens=2048) -> dict:
+                   tools=None, temperature=0.3, max_tokens=2048,
+                   tool_choice="auto") -> dict:
     """Wrapper with exponential backoff retry logic."""
     p = provider.lower()
-    if p in ("openrouter", "groq"):
+    if p in ("openrouter", "groq", "openai"):
         return await _call_with_retry(
-            _openai_compat, messages, p, model, tools, temperature, max_tokens
+            _openai_compat, messages, p, model, tools, temperature, max_tokens, tool_choice
         )
     elif p == "gemini":
         return await _call_with_retry(
             _gemini, messages, model, temperature, max_tokens
         )
     return await _call_with_retry(
-        _openai_compat, messages, "openrouter", model, tools, temperature, max_tokens
+        _openai_compat, messages, "openrouter", model, tools, temperature, max_tokens, tool_choice
     )
 
 
 async def _call_with_retry(func, *args, **kwargs):
     """
-    Retry logic with exponential backoff (1s, 2s, 4s).
-    Max 3 retries on timeout, 429, or 5xx errors.
+    Retry logic with exponential backoff.
+    For 429s, respects the Retry-After header or uses longer delays.
+    Max 4 retries on timeout, 429, or 5xx errors.
     """
-    max_retries = 3
-    backoff_delays = [1, 2, 4]  # seconds
+    max_retries = 4
     last_exception = None
 
     for attempt in range(max_retries):
         try:
             return await func(*args, **kwargs)
         except (httpx.TimeoutException, httpx.HTTPStatusError) as e:
-            # Check if it's a retryable error
             is_retryable = False
             reason = ""
+            delay = 2 ** attempt  # default: 1, 2, 4, 8s
 
             if isinstance(e, httpx.TimeoutException):
                 is_retryable = True
@@ -51,51 +52,63 @@ async def _call_with_retry(func, *args, **kwargs):
                 if status == 429 or status >= 500:
                     is_retryable = True
                     reason = f"HTTP {status}"
+                    # Respect Retry-After header if present
+                    retry_after = e.response.headers.get("retry-after")
+                    if retry_after:
+                        try:
+                            delay = float(retry_after) + 1
+                        except ValueError:
+                            pass
+                    elif status == 429:
+                        delay = max(delay, 15)  # at least 15s for rate limits
 
             if not is_retryable or attempt == max_retries - 1:
                 raise
 
             last_exception = e
-            delay = backoff_delays[attempt]
             logger.warning(
-                f"LLM call failed ({reason}), retry {attempt + 1}/{max_retries} "
-                f"after {delay}s"
+                f"LLM call failed ({reason}), retry {attempt + 1}/{max_retries} after {delay:.0f}s"
             )
             await asyncio.sleep(delay)
         except Exception:
             raise
 
-    # Should not reach here, but just in case
     if last_exception:
         raise last_exception
 
 
-async def _openai_compat(messages, provider, model, tools, temperature, max_tokens):
+async def _openai_compat(messages, provider, model, tools, temperature, max_tokens,
+                         tool_choice="auto"):
     if provider == "groq":
         base, key = "https://api.groq.com/openai/v1", settings.groq_api_key
-        model = model or settings.groq_default_model
+        model = model or settings.groq_model or settings.groq_default_model
+    elif provider == "openai":
+        base, key = "https://api.openai.com/v1", settings.openai_api_key
+        model = model or settings.openai_default_model
     else:
         base, key = settings.openrouter_base_url, settings.openrouter_api_key
-        model = model or settings.openrouter_default_model
+        model = model or settings.openrouter_model or settings.openrouter_default_model
 
     payload = dict(model=model, messages=messages,
                    temperature=temperature, max_tokens=max_tokens)
     if tools:
         payload["tools"] = tools
-        payload["tool_choice"] = "auto"
+        payload["tool_choice"] = tool_choice
 
     async with httpx.AsyncClient(timeout=90) as c:
         r = await c.post(f"{base}/chat/completions",
                          headers={"Authorization": f"Bearer {key}",
                                   "HTTP-Referer": "https://localhost"},
                          json=payload)
+        if not r.is_success:
+            print(f"[LLM ERROR] {provider} HTTP {r.status_code}: {r.text[:800]}", flush=True)
         r.raise_for_status()
     msg = r.json()["choices"][0]["message"]
     return {"content": msg.get("content") or "", "tool_calls": msg.get("tool_calls")}
 
 
 async def _gemini(messages, model, temperature, max_tokens):
-    model = model or settings.gemini_default_model
+    model = model or settings.gemini_model or settings.gemini_default_model
     contents = [{"role": "user" if m["role"] != "assistant" else "model",
                  "parts": [{"text": m["content"]}]} for m in messages]
     url = (f"https://generativelanguage.googleapis.com/v1beta/models/"

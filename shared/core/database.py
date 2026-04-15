@@ -23,7 +23,10 @@ TICKET_PREFIXES = {
 
 
 def _conn():
-    return psycopg2.connect(settings.database_url)
+    # psycopg2 doesn't understand SQLAlchemy dialect prefixes like
+    # "postgresql+psycopg2://..." — strip it to plain "postgresql://..."
+    url = settings.database_url.replace("postgresql+psycopg2://", "postgresql://", 1)
+    return psycopg2.connect(url)
 
 
 def init_schema():
@@ -64,9 +67,15 @@ def init_schema():
         """)
         # Backfill new columns if upgrading existing DB
         for col, defn in [
-            ("ticket_type",    "TEXT NOT NULL DEFAULT 'Task'"),
-            ("source",         "TEXT NOT NULL DEFAULT 'agent'"),
-            ("reporter_email", "TEXT"),
+            ("ticket_type",         "TEXT NOT NULL DEFAULT 'Task'"),
+            ("source",              "TEXT NOT NULL DEFAULT 'agent'"),
+            ("reporter_email",      "TEXT"),
+            ("acceptance_criteria", "TEXT"),
+            ("labels",              "TEXT"),
+            ("parent_task_id",      "TEXT"),
+            ("sprint_id",           "TEXT"),
+            ("sla_due_at",          "TIMESTAMPTZ"),
+            ("created_by",          "TEXT DEFAULT 'manager'"),
         ]:
             try:
                 cur.execute(f"ALTER TABLE tasks ADD COLUMN IF NOT EXISTS {col} {defn};")

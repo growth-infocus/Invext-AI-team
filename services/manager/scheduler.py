@@ -294,6 +294,124 @@ async def job_weekly_report() -> None:
     )
 
 
+IDLE_LEARNING_TASKS: dict[str, list[str]] = {
+    "developer": [
+        "Review the codebase for any TODO/FIXME comments and create tickets for the important ones.",
+        "Audit dependencies for outdated packages and propose upgrade candidates.",
+        "Identify any functions longer than 50 lines that could be refactored for clarity.",
+        "Write or improve unit tests for the lowest-covered modules.",
+        "Review recent merged code for potential performance bottlenecks.",
+    ],
+    "devops": [
+        "Review all Docker images for unnecessary layers and propose optimisations.",
+        "Audit environment variable usage — identify any secrets that should move to a vault.",
+        "Check log retention policies and alert thresholds are correctly configured.",
+        "Verify all services have health-check endpoints and restart policies.",
+        "Review CI pipeline run times and identify the slowest steps.",
+    ],
+    "qa": [
+        "Review open bugs older than 7 days and update their priority/status.",
+        "Identify test cases that have been flaky recently and investigate root causes.",
+        "Audit the regression suite for duplicate or redundant test cases.",
+        "Propose new edge-case tests for the most-changed modules this week.",
+        "Verify that all P1 bugs have been closed or have active assignees.",
+    ],
+    "security": [
+        "Run a dependency vulnerability scan and report any CVEs above CVSS 7.0.",
+        "Review authentication flows for any missing rate-limiting or brute-force protections.",
+        "Check all API endpoints for missing authorisation middleware.",
+        "Audit logging to ensure no sensitive data (passwords, tokens) is logged.",
+        "Review CORS and CSP headers for the current production configuration.",
+    ],
+    "docs": [
+        "Identify API endpoints that have no documentation and draft stubs.",
+        "Review existing docs for outdated screenshots or references to renamed features.",
+        "Create a glossary entry for any new technical terms introduced this sprint.",
+        "Improve the README onboarding section based on common setup questions.",
+        "Write a runbook for the most recent production incident.",
+    ],
+    "support": [
+        "Compile a FAQ from the top 10 most repeated customer questions this week.",
+        "Review all P1 support tickets closed this week and extract common root causes.",
+        "Draft canned responses for the 5 most common issue categories.",
+        "Identify any product pain points that have come up 3+ times and create a feature request.",
+        "Update the support knowledge base with solutions from recently closed tickets.",
+    ],
+    "design": [
+        "Audit the design system for any components that lack dark-mode variants.",
+        "Review all current screens for inconsistent spacing or typography.",
+        "Create design tokens documentation for spacing, colour, and type scales.",
+        "Identify UX improvements from the top 5 recent support complaints.",
+        "Explore accessibility improvements — check colour contrast ratios across key screens.",
+    ],
+    "ux": [
+        "Analyse the most-used user flows and identify friction points.",
+        "Map the current onboarding journey and flag drop-off risks.",
+        "Create a user journey map for the top 3 user personas.",
+        "Review error messages across the app for clarity and actionability.",
+        "Propose A/B test hypotheses for the feature with the lowest engagement.",
+    ],
+    "ui_test": [
+        "Audit existing Playwright tests for any that rely on fragile selectors and refactor them.",
+        "Write tests for any new UI components added in the last sprint.",
+        "Run a full accessibility audit with axe-core and report violations.",
+        "Check all form validation states (empty, invalid, server error) have test coverage.",
+        "Verify responsive breakpoints on the 3 most-used pages.",
+    ],
+    "api_test": [
+        "Audit API test coverage — identify endpoints with no automated tests.",
+        "Run contract tests against the latest API schema and report any drift.",
+        "Add negative test cases (invalid auth, missing fields, wrong types) for untested endpoints.",
+        "Review all test data fixtures for stale or environment-specific values.",
+        "Load-test the top 5 most frequently called endpoints and report baseline metrics.",
+    ],
+    "qa_auto": [
+        "Review the CI test pipeline for any jobs that could run in parallel to reduce total time.",
+        "Identify flaky tests in the last 20 CI runs and file tickets.",
+        "Update test environment setup scripts to remove manual steps.",
+        "Create a test coverage report and highlight modules below 60%.",
+        "Propose automation for the top 3 manual test cases still in the regression pack.",
+    ],
+}
+
+
+async def job_idle_work() -> None:
+    """
+    Every 20 min — Give learning / maintenance tasks to idle agents.
+    An agent is idle if it has no in_progress tasks.
+    """
+    import random
+    log.info("💤 Checking for idle agents")
+    all_tasks = get_tasks(status="in_progress", limit=200)
+    busy_roles = {t.get("assigned_to") for t in all_tasks if t.get("assigned_to")}
+
+    roles = [r for r in AGENT_SERVICES if r != "manager"]
+    idle_roles = [r for r in roles if r not in busy_roles]
+
+    if not idle_roles:
+        log.debug("All agents are busy — no idle work needed")
+        return
+
+    log.info(f"  Idle agents: {idle_roles}")
+
+    async def assign_idle_task(role: str) -> None:
+        tasks_for_role = IDLE_LEARNING_TASKS.get(role, [
+            "Review your recent work, identify any improvements you can make, and document your findings."
+        ])
+        task = random.choice(tasks_for_role)
+        prompt = (
+            f"You currently have no active tasks assigned. Use this idle time productively.\n\n"
+            f"**Idle Learning Task:** {task}\n\n"
+            f"Work through this task thoroughly. Record any findings, tickets, or improvements "
+            f"you identify. When done, summarise what you accomplished."
+        )
+        log.info(f"  → Assigning idle task to {role}: {task[:60]}…")
+        await _ask_agent(role, prompt, timeout=120)
+
+    await asyncio.gather(*[assign_idle_task(r) for r in idle_roles], return_exceptions=True)
+    log.info(f"  Idle tasks dispatched to {len(idle_roles)} agents")
+
+
 async def job_health_check() -> None:
     """Every 5 min — Verify all agent services are reachable."""
     down = []
@@ -362,6 +480,13 @@ def create_scheduler() -> AsyncIOScheduler:
         IntervalTrigger(minutes=5),
         id="health_check",
         name="5-min Health Check",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        job_idle_work,
+        IntervalTrigger(minutes=20),
+        id="idle_work",
+        name="Idle Agent Learning Tasks",
         replace_existing=True,
     )
 

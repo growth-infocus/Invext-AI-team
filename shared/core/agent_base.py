@@ -1,12 +1,16 @@
 """
 shared/core/agent_base.py — BaseAgent for all microservices.
 
-Every agent service:
-  1. Extends BaseAgent
-  2. Subscribes to its Redis stream on startup
-  3. Runs the ReAct loop per task
-  4. Maintains per-role memory + skills
-  5. Publishes results back to the results stream
+Task flow per agent:
+  1. Receive task from Redis stream
+  2. Create a work plan (submit_work_plan tool)
+  3. Store work plan in Redis → POST to manager stream for review
+  4. If AGENT_WORKPLAN_REQUIRE_APPROVAL=true: wait (poll) until manager approves/rejects
+     - Approved  → run task
+     - Rejected  → log rejection + mark ticket blocked
+     - Timeout   → auto-proceed after WORKPLAN_APPROVAL_TIMEOUT_MINUTES
+  5. Run ReAct loop
+  6. Publish result to manager stream
 """
 from __future__ import annotations
 
@@ -16,6 +20,8 @@ import logging
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Optional
+
+import redis as _sync_redis
 
 from shared.core.config import settings
 from shared.core.llm import call_llm
@@ -28,45 +34,116 @@ from shared.core.memory import AgentMemory, ROLE_SKILLS
 
 log = logging.getLogger("agent")
 
+# How long (seconds) an agent waits for manager approval before auto-proceeding
+WORKPLAN_APPROVAL_TIMEOUT = 10 * 60   # 10 minutes
+WORKPLAN_POLL_INTERVAL    = 15        # check every 15 seconds
+
+
+def _redis_sync() -> _sync_redis.Redis:
+    return _sync_redis.from_url(settings.redis_url, decode_responses=True)
+
 
 def _get_memory_backend(role: str):
-    """Factory function to select memory backend based on settings."""
     if settings.use_graphiti_memory:
         from shared.core.graphiti_memory import GraphitiMemory
         return GraphitiMemory(role)
-    else:
-        return AgentMemory(role)
+    return AgentMemory(role)
 
+
+# ── Work-plan Redis helpers ───────────────────────────────────────────────────
+
+def _workplan_key(role: str, task_id: str) -> str:
+    return f"workplan:{role}:{task_id}"
+
+
+def store_workplan(role: str, task_id: str, ticket_id: str, plan: dict):
+    r = _redis_sync()
+    data = {
+        **plan,
+        "task_id":   task_id,
+        "ticket_id": ticket_id,
+        "agent":     role,
+        "status":    "pending_manager_review",
+        "created_at": datetime.utcnow().isoformat(),
+        "feedback":  "",
+    }
+    r.setex(_workplan_key(role, task_id), 60 * 60 * 24 * 7, json.dumps(data))
+
+
+def get_workplan(role: str, task_id: str) -> Optional[dict]:
+    r = _redis_sync()
+    raw = r.get(_workplan_key(role, task_id))
+    return json.loads(raw) if raw else None
+
+
+def set_workplan_status(role: str, task_id: str, status: str, feedback: str = ""):
+    """Called by manager to approve/reject an agent's work plan."""
+    r = _redis_sync()
+    raw = r.get(_workplan_key(role, task_id))
+    if not raw:
+        return False
+    data = json.loads(raw)
+    data["status"]       = status
+    data["feedback"]     = feedback
+    data["reviewed_at"]  = datetime.utcnow().isoformat()
+    r.setex(_workplan_key(role, task_id), 60 * 60 * 24 * 7, json.dumps(data))
+    return True
+
+
+def list_pending_workplans() -> list[dict]:
+    """Return all work plans awaiting manager review."""
+    r = _redis_sync()
+    keys = r.keys("workplan:*")
+    result = []
+    for key in keys:
+        raw = r.get(key)
+        if raw:
+            try:
+                d = json.loads(raw)
+                if d.get("status") == "pending_manager_review":
+                    result.append(d)
+            except Exception:
+                pass
+    return sorted(result, key=lambda x: x.get("created_at", ""))
+
+
+def list_all_workplans(status_filter: Optional[str] = None) -> list[dict]:
+    """Return all work plans, optionally filtered by status."""
+    r = _redis_sync()
+    keys = r.keys("workplan:*")
+    result = []
+    for key in keys:
+        raw = r.get(key)
+        if raw:
+            try:
+                d = json.loads(raw)
+                if not status_filter or d.get("status") == status_filter:
+                    result.append(d)
+            except Exception:
+                pass
+    return sorted(result, key=lambda x: x.get("created_at", ""), reverse=True)
+
+
+# ── BaseAgent ─────────────────────────────────────────────────────────────────
 
 class BaseAgent(ABC):
-    """
-    Independent-service base agent.
-
-    To create a new agent service:
-      class SecurityAgent(BaseAgent):
-          role = "security"
-          provider = "openrouter"
-          required_tools = ["web_search", "code_run"]
-
-          @property
-          def system_prompt(self) -> str:
-              return "You are a security engineer..."
-    """
-
     role: str = "base"
     provider: str = "openrouter"
     model: Optional[str] = None
+    tool_model: Optional[str] = None
     required_tools: list[str] = []
 
     def __init__(self):
         self.memory = _get_memory_backend(self.role)
-        if settings.use_graphiti_memory:
-            log.info(f"[{self.role}] Using Graphiti memory backend")
-        else:
-            log.info(f"[{self.role}] Using Redis memory backend")
         self._running = False
+        env_provider = getattr(settings, f"{self.role}_provider", None)
+        if env_provider:
+            self.provider = env_provider
+        if self.provider == "groq" and not self.tool_model:
+            self.tool_model = settings.groq_tool_model
+        if self.provider == "openai" and not self.tool_model:
+            self.tool_model = settings.openai_default_model
 
-    # ── Subclass implements ───────────────────────────────────────────────────
     @property
     @abstractmethod
     def system_prompt(self) -> str: ...
@@ -76,129 +153,407 @@ class BaseAgent(ABC):
         return ToolRegistry.get_schemas(*self.required_tools)
 
     # ── Startup ───────────────────────────────────────────────────────────────
+
     async def startup(self):
-        """Call once on service startup."""
         await self.memory.connect()
-        # Load role-specific built-in skills
         skills = ROLE_SKILLS.get(self.role, [])
         await self.memory.load_skills(skills)
         await bus.connect()
-        log.info(f"[{self.role}] 🚀 Agent ready | skills={len(skills)} | tools={self.required_tools}")
+        log.info(f"[{self.role}] Agent ready | tools={self.required_tools}")
 
-    # ── Main service loop — listens for tasks forever ─────────────────────────
+    # ── Main loop ─────────────────────────────────────────────────────────────
+
     async def listen(self):
-        """Blocking: subscribe to Redis stream and process tasks as they arrive."""
         self._running = True
-        log.info(f"[{self.role}] 👂 Listening for tasks…")
+        log.info(f"[{self.role}] Listening for tasks…")
         async for msg_id, payload in bus.consume(self.role):
             task_id = payload.get("task_id")
             if not task_id:
                 continue
-            log.info(f"[{self.role}] 📥 Received task {payload.get('ticket_id','?')}")
+            log.info(f"[{self.role}] Received task {payload.get('ticket_id','?')}")
             asyncio.create_task(self._handle_task(task_id))
 
     async def _handle_task(self, task_id: str):
         task = get_task(task_id)
         if not task:
-            log.error(f"[{self.role}] Task {task_id} not found in DB")
+            log.error(f"[{self.role}] Task {task_id} not found")
             return
 
-        update_task(task_id, status="in_progress")
+        update_task(task_id, status="planning")
         log_event(task_id, task["ticket_id"], self.role, "comment",
-                  f"🟡 {self.role.title()} picked up task")
+                  f"{self.role.title()} received task — creating work plan")
 
         try:
+            # ── Steps 1–2: plan → submit → await approval (with revision loop) ─
+            work_plan = await self._plan_approval_loop(task)
+            if work_plan is None:
+                # Permanently rejected after max revisions
+                return
+
+            # ── Step 3: execute ───────────────────────────────────────────────
+            update_task(task_id, status="in_progress")
+            log_event(task_id, task["ticket_id"], self.role, "comment",
+                      "Work plan approved — starting execution")
+
+            questions = work_plan.get("questions_for_manager", "None")
+            if questions and questions.lower() not in ("none", "n/a", ""):
+                await self._ask_manager(task_id, task["ticket_id"], questions)
+
             result = await self.run(task_id)
+
         except Exception as e:
             result = f"FAILED: {e}"
             update_task(task_id, status="failed", result=result)
-            log_event(task_id, task["ticket_id"], self.role, "status_change", f"❌ {e}")
+            log_event(task_id, task["ticket_id"], self.role, "status_change", f"Error: {e}")
             return
 
         update_task(task_id, status="done", result=result)
-
-        # Save a memory of what was learned
         await self.memory.remember(
             f"Completed [{task['ticket_id']}] {task['title'][:80]} — {result[:150]}"
         )
-
-        # Publish result back for Manager / dashboard
         await bus.publish_result({
-            "task_id":    task_id,
-            "ticket_id":  task["ticket_id"],
-            "agent":      self.role,
-            "status":     "done",
-            "result":     result,
+            "task_id":   task_id,
+            "ticket_id": task["ticket_id"],
+            "agent":     self.role,
+            "status":    "done",
+            "result":    result,
         })
 
-    # ── ReAct execution loop ──────────────────────────────────────────────────
+    # ── Plan → approval loop (with revision on rejection) ────────────────────
+
+    MAX_PLAN_REVISIONS = 3
+
+    async def _plan_approval_loop(self, task: dict) -> Optional[dict]:
+        """
+        Submits a work plan to the manager and loops on rejection:
+          1. Create work plan
+          2. Store + notify manager
+          3. Wait for manager decision
+             - approved  → return the work plan
+             - rejected  → revise plan using feedback → go to 2
+             - timeout   → auto-proceed (return plan as-is)
+          4. After MAX_PLAN_REVISIONS rejections → block ticket and return None
+        """
+        task_id   = task["id"]
+        ticket_id = task["ticket_id"]
+
+        work_plan      = await self._create_work_plan(task)
+        prior_feedback = None   # feedback from previous rejection round
+
+        for revision in range(self.MAX_PLAN_REVISIONS + 1):
+            attempt_label = "initial plan" if revision == 0 else f"revision #{revision}"
+
+            store_workplan(self.role, task_id, ticket_id, work_plan)
+            log_event(task_id, ticket_id, self.role, "comment",
+                      f"Work plan submitted ({attempt_label}).\n"
+                      f"Approach: {work_plan.get('approach','')[:200]}\n"
+                      f"Deliverables: {', '.join(work_plan.get('deliverables', []))}\n"
+                      f"Estimate: {work_plan.get('estimated_hours','?')}h\n"
+                      f"Questions: {work_plan.get('questions_for_manager','None')}")
+
+            await self._notify_manager_of_plan(task, work_plan, revision=revision)
+
+            if not settings.agent_workplan_require_approval:
+                return work_plan
+
+            approved, feedback = await self._await_manager_approval(task_id, ticket_id)
+
+            if approved:
+                if feedback:
+                    log_event(task_id, ticket_id, self.role, "comment",
+                              f"Manager approved with notes: {feedback}")
+                return work_plan
+
+            # ── Rejected ──────────────────────────────────────────────────────
+            log_event(task_id, ticket_id, self.role, "comment",
+                      f"Plan rejected by manager (attempt {revision + 1}/{self.MAX_PLAN_REVISIONS}). "
+                      f"Feedback: {feedback}")
+
+            if revision >= self.MAX_PLAN_REVISIONS:
+                # Exhausted all revision attempts
+                update_task(task_id, status="blocked",
+                            result=f"Work plan rejected {self.MAX_PLAN_REVISIONS + 1} times. "
+                                   f"Last feedback: {feedback}")
+                log_event(task_id, ticket_id, self.role, "status_change",
+                          f"Blocked after {self.MAX_PLAN_REVISIONS + 1} rejected work plans. "
+                          f"Manager escalation required.")
+                return None
+
+            # Revise the plan based on manager's feedback
+            log_event(task_id, ticket_id, self.role, "comment",
+                      "Revising work plan based on manager feedback…")
+            work_plan = await self._revise_work_plan(task, work_plan, feedback)
+            prior_feedback = feedback
+
+        return None  # should not reach here
+
+    # ── Work plan creation ────────────────────────────────────────────────────
+
+    async def _create_work_plan(self, task: dict) -> dict:
+        from shared.tools.plan_tools import get_pending_work_plan
+
+        work_plan_schema = ToolRegistry.get_schemas("submit_work_plan")
+        if not work_plan_schema:
+            return self._default_work_plan(task)
+
+        mem_context = await self.memory.recall(task["title"] + " " + task.get("description", ""))
+        skills      = await self.memory.get_skills()
+        skills_text = ("\nYour skills:\n" + "\n".join(f"• {s}" for s in skills)) if skills else ""
+
+        messages = [
+            {"role": "system", "content": (
+                f"{self.system_prompt}{skills_text}\n\n"
+                "You have just been assigned a task. Before starting, submit a detailed work plan "
+                "to your manager for approval. Call submit_work_plan with your plan now.\n"
+                "Be specific: exact steps, tools, deliverables, hours, and any questions/blockers."
+            )},
+            {"role": "user", "content": (
+                f"Task: [{task['ticket_id']}] {task['title']}\n"
+                f"Description: {task.get('description','')}\n"
+                f"Acceptance criteria: {task.get('acceptance_criteria','')}\n"
+                f"Priority: {task.get('priority','P3')}"
+                + (f"\n\nRelevant memory:\n{mem_context}" if mem_context else "")
+            )},
+        ]
+
+        response = await call_llm(
+            messages=messages,
+            provider=self.provider,
+            model=self.tool_model or self.model,
+            tools=work_plan_schema,
+            temperature=0.2,
+            max_tokens=1500,
+            tool_choice="required",
+        )
+        for tc in (response.get("tool_calls") or []):
+            args = json.loads(tc["function"].get("arguments", "{}") or "{}")
+            await ToolRegistry.execute(tc["function"]["name"], args)
+
+        return get_pending_work_plan() or self._default_work_plan(task)
+
+    def _default_work_plan(self, task: dict) -> dict:
+        return {
+            "task_summary":          task["title"],
+            "approach":              "Standard approach for this task type",
+            "tools_needed":          self.required_tools[:5],
+            "deliverables":          ["Task completed as specified"],
+            "estimated_hours":       4,
+            "risks_or_blockers":     "None identified",
+            "questions_for_manager": "None",
+        }
+
+    # ── Revise work plan based on manager feedback ────────────────────────────
+
+    async def _revise_work_plan(self, task: dict, previous_plan: dict, feedback: str) -> dict:
+        """
+        Ask the LLM to produce a new work plan that addresses the manager's feedback.
+        The previous plan and the feedback are both injected into context.
+        """
+        from shared.tools.plan_tools import get_pending_work_plan
+
+        work_plan_schema = ToolRegistry.get_schemas("submit_work_plan")
+        if not work_plan_schema:
+            return self._default_work_plan(task)
+
+        skills      = await self.memory.get_skills()
+        skills_text = ("\nYour skills:\n" + "\n".join(f"• {s}" for s in skills)) if skills else ""
+
+        previous_summary = (
+            f"Your previous plan:\n"
+            f"  Approach: {previous_plan.get('approach','')}\n"
+            f"  Deliverables: {', '.join(previous_plan.get('deliverables', []))}\n"
+            f"  Estimate: {previous_plan.get('estimated_hours','?')}h\n"
+            f"  Questions: {previous_plan.get('questions_for_manager','None')}"
+        )
+
+        messages = [
+            {"role": "system", "content": (
+                f"{self.system_prompt}{skills_text}\n\n"
+                "Your manager has reviewed your work plan and rejected it. "
+                "Read the feedback carefully, address every point, and submit a revised work plan. "
+                "Call submit_work_plan with the updated plan."
+            )},
+            {"role": "user", "content": (
+                f"Task: [{task['ticket_id']}] {task['title']}\n"
+                f"Description: {task.get('description','')}\n"
+                f"Acceptance criteria: {task.get('acceptance_criteria','')}\n\n"
+                f"{previous_summary}\n\n"
+                f"MANAGER FEEDBACK (you MUST address all of this):\n{feedback}\n\n"
+                "Revise your plan to address the feedback. Be specific about what you changed and why."
+            )},
+        ]
+
+        response = await call_llm(
+            messages=messages,
+            provider=self.provider,
+            model=self.tool_model or self.model,
+            tools=work_plan_schema,
+            temperature=0.2,
+            max_tokens=1500,
+            tool_choice="required",
+        )
+        for tc in (response.get("tool_calls") or []):
+            args = json.loads(tc["function"].get("arguments", "{}") or "{}")
+            await ToolRegistry.execute(tc["function"]["name"], args)
+
+        revised = get_pending_work_plan()
+        if not revised:
+            # Fallback: patch the previous plan with a note
+            revised = dict(previous_plan)
+            revised["approach"] = f"[REVISED per feedback: {feedback[:200]}]\n\n" + previous_plan.get("approach", "")
+        return revised
+
+    # ── Notify manager of pending work plan ───────────────────────────────────
+
+    async def _notify_manager_of_plan(self, task: dict, work_plan: dict, revision: int = 0):
+        label = "initial plan" if revision == 0 else f"revision #{revision}"
+        try:
+            await bus.publish("manager", {
+                "type":         "workplan_pending_review",
+                "from_role":    self.role,
+                "task_id":      task["id"],
+                "ticket_id":    task["ticket_id"],
+                "plan_summary": work_plan.get("task_summary", task["title"]),
+                "questions":    work_plan.get("questions_for_manager", "None"),
+                "revision":     revision,
+                "label":        label,
+            })
+        except Exception as e:
+            log.warning(f"[{self.role}] Could not notify manager: {e}")
+
+    # ── Wait for manager approval (polls Redis) ───────────────────────────────
+
+    async def _await_manager_approval(
+        self, task_id: str, ticket_id: str
+    ) -> tuple[bool, str]:
+        """
+        Poll Redis until the manager approves/rejects this work plan.
+        Returns (approved: bool, feedback: str).
+        Auto-proceeds (approved=True) after WORKPLAN_APPROVAL_TIMEOUT seconds.
+        """
+        elapsed  = 0
+        attempts = 0
+
+        log.info(f"[{self.role}] Waiting for manager approval on task {task_id}…")
+
+        while elapsed < WORKPLAN_APPROVAL_TIMEOUT:
+            await asyncio.sleep(WORKPLAN_POLL_INTERVAL)
+            elapsed  += WORKPLAN_POLL_INTERVAL
+            attempts += 1
+
+            plan = get_workplan(self.role, task_id)
+            if not plan:
+                # Plan was deleted — auto-proceed
+                break
+
+            status   = plan.get("status", "pending_manager_review")
+            feedback = plan.get("feedback", "")
+
+            if status == "approved":
+                log.info(f"[{self.role}] Work plan approved by manager")
+                return True, feedback
+
+            if status == "rejected":
+                log.warning(f"[{self.role}] Work plan rejected: {feedback}")
+                return False, feedback
+
+            # Still pending — log a heartbeat every 2 minutes
+            if attempts % 8 == 0:
+                log_event(task_id, ticket_id, self.role, "comment",
+                          f"Still waiting for manager approval ({elapsed//60}m elapsed)")
+
+        # Timeout — auto-proceed and log
+        log.info(f"[{self.role}] Work plan approval timeout — auto-proceeding")
+        log_event(task_id, ticket_id, self.role, "comment",
+                  f"No manager response after {WORKPLAN_APPROVAL_TIMEOUT//60}m — auto-proceeding")
+        return True, ""
+
+    # ── Ask manager ───────────────────────────────────────────────────────────
+
+    async def _ask_manager(self, task_id: str, ticket_id: str, questions: str):
+        log_event(task_id, ticket_id, self.role, "comment",
+                  f"[QUESTION FOR MANAGER] {questions}")
+        try:
+            await bus.publish("manager", {
+                "type":      "agent_question",
+                "from_role": self.role,
+                "task_id":   task_id,
+                "ticket_id": ticket_id,
+                "question":  questions,
+            })
+        except Exception as e:
+            log.warning(f"[{self.role}] Could not publish question to manager: {e}")
+
+    # ── ReAct loop ────────────────────────────────────────────────────────────
+
     async def run(self, task_id: str) -> str:
         task = get_task(task_id)
         if not task:
             return "Task not found."
-
         goal = f"Ticket: {task['ticket_id']}\nTitle: {task['title']}\n\n{task['description']}"
         if task.get("acceptance_criteria"):
             goal += f"\n\nAcceptance criteria:\n{task['acceptance_criteria']}"
-
-        # Inject memory context
-        mem_context = await self.memory.recall(task["title"] + " " + task["description"])
+        mem_context = await self.memory.recall(task["title"] + " " + task.get("description", ""))
         skills      = await self.memory.get_skills()
-        skills_text = ("\n\nYour skills:\n" + "\n".join(f"• {s}" for s in skills)) if skills else ""
-
-        messages = [
-            {"role": "system", "content": self.system_prompt + skills_text},
-        ]
+        skills_text = ("\nYour skills:\n" + "\n".join(f"• {s}" for s in skills)) if skills else ""
+        messages = [{"role": "system", "content": self.system_prompt + skills_text}]
         if mem_context:
             messages.append({"role": "system", "content": mem_context})
         messages.append({"role": "user", "content": f"Your goal:\n{goal}"})
-
         return await self._react_loop(messages, task_id)
 
-    async def _react_loop(self, messages: list[dict], task_id: str,
-                          max_steps: int = 12) -> str:
-        task = get_task(task_id)
-        ticket_id = task["ticket_id"] if task else task_id
+    async def _react_loop(self, messages: list[dict], task_id: Optional[str] = None,
+                          max_steps: Optional[int] = None) -> str:
+        if max_steps is None:
+            max_steps = settings.agent_max_react_steps
+        task      = get_task(task_id) if task_id else None
+        ticket_id = task["ticket_id"] if task else (task_id or "adhoc")
+
+        def _log(msg):
+            if task_id:
+                log_event(task_id, ticket_id, self.role, "comment", msg)
 
         for step in range(max_steps):
-            log_event(task_id, ticket_id, self.role, "comment", f"⚙️ Step {step+1}")
-
+            _log(f"Step {step+1}")
+            tc_mode  = "required" if (step == 0 and self.tools) else "auto"
             response = await call_llm(
                 messages=messages,
                 provider=self.provider,
-                model=self.model,
+                model=self.tool_model or self.model,
                 tools=self.tools or None,
                 temperature=0.2,
+                tool_choice=tc_mode,
             )
             content    = response.get("content") or ""
             tool_calls = response.get("tool_calls")
-            messages.append({"role": "assistant", "content": content})
-
+            asst_msg   = {"role": "assistant", "content": content}
+            if tool_calls:
+                asst_msg["tool_calls"] = tool_calls
+            messages.append(asst_msg)
             if not tool_calls:
                 return content or "(task complete, no output)"
-
             for tc in tool_calls:
                 fn   = tc["function"]["name"]
                 args = json.loads(tc["function"].get("arguments", "{}") or "{}")
-                log_event(task_id, ticket_id, self.role, "comment", f"🔧 {fn}({args})")
+                _log(f"Tool: {fn}")
                 result = await ToolRegistry.execute(fn, args)
                 messages.append({
-                    "role":        "tool",
+                    "role":         "tool",
                     "tool_call_id": tc.get("id", ""),
                     "name":         fn,
                     "content":      str(result),
                 })
-
         return next((m["content"] for m in reversed(messages)
                      if m["role"] == "assistant" and m.get("content")), "Max steps reached.")
 
     # ── Direct Q&A ────────────────────────────────────────────────────────────
+
     async def ask(self, question: str) -> str:
-        mem = await self.memory.recall(question)
+        mem    = await self.memory.recall(question)
         skills = await self.memory.get_skills()
-        sys = self.system_prompt
+        sys    = self.system_prompt
         if skills:
-            sys += "\n\nYour skills:\n" + "\n".join(f"• {s}" for s in skills)
+            sys += "\nYour skills:\n" + "\n".join(f"• {s}" for s in skills)
         msgs = [{"role": "system", "content": sys}]
         if mem:
             msgs.append({"role": "system", "content": mem})
@@ -207,22 +562,19 @@ class BaseAgent(ABC):
         return r.get("content", "")
 
     # ── Daily plan ────────────────────────────────────────────────────────────
+
     async def generate_daily_plan(self, pending_tasks: list[dict]) -> str:
         tasks_text = "\n".join(
             f"[{t['priority']}] {t['ticket_id']} {t['title']}: {t['description'][:100]}"
             for t in pending_tasks
         ) or "No pending tasks."
-        mem = await self.memory.recall("daily work priorities")
+        mem  = await self.memory.recall("daily work priorities")
         plan = await self.ask(
             f"Today: {datetime.utcnow().date()}\nOpen tasks:\n{tasks_text}"
             f"\n{'Context: ' + mem if mem else ''}"
             f"\nWrite a short, realistic daily work plan as a {self.role}."
         )
         save_daily_plan(self.role, plan)
-
-        done_yday = []  # Would query for yesterday's completions in real use
         save_standup(self.role, "See previous day's results", plan[:300], "None")
-        await self.memory.remember(
-            f"Daily plan {datetime.utcnow().date()}: {plan[:200]}"
-        )
+        await self.memory.remember(f"Daily plan {datetime.utcnow().date()}: {plan[:200]}")
         return plan

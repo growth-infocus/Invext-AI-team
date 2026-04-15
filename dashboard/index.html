@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AI Team HQ — Engineering Dashboard</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous" />
   <style>
     :root {
       --bg: #0d1117;
@@ -67,27 +68,51 @@
     }
 
     .nav-link {
-      padding: 12px 14px;
+      padding: 10px 12px;
       border-radius: 6px;
       cursor: pointer;
       display: flex;
       align-items: center;
       gap: 10px;
-      font-size: 14px;
+      font-size: 13px;
       color: var(--text-secondary);
-      transition: all 0.2s;
+      transition: all 0.18s;
       border: 1px solid transparent;
+      user-select: none;
     }
 
     .nav-link:hover {
       color: var(--text);
-      background: rgba(88, 166, 255, 0.1);
+      background: rgba(88, 166, 255, 0.08);
     }
 
     .nav-link.active {
       background: rgba(88, 166, 255, 0.15);
       color: var(--accent);
-      border-color: var(--accent);
+      border-color: rgba(88, 166, 255, 0.35);
+    }
+
+    .nav-link .nav-icon {
+      width: 16px;
+      text-align: center;
+      font-size: 13px;
+      flex-shrink: 0;
+    }
+
+    .nav-section-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      padding: 12px 12px 4px;
+      opacity: 0.6;
+    }
+
+    .nav-divider {
+      height: 1px;
+      background: var(--border);
+      margin: 8px 0;
     }
 
     .sidebar-bottom {
@@ -894,16 +919,55 @@
   </div>
 
   <div class="nav-links">
-    <div class="nav-link active" onclick="showSection('dashboard')">🏠 Dashboard</div>
-    <div class="nav-link" onclick="showSection('team')">👥 My Team</div>
-    <div class="nav-link" onclick="showSection('projects')">📁 Projects</div>
-    <div class="nav-link" onclick="showSection('bugs')">🐛 Bug Tracker</div>
-    <div class="nav-link" onclick="showSection('reports')">📊 Reports</div>
-    <div class="nav-link" onclick="showSection('ask')">💬 Ask Team</div>
-    <div class="nav-link" onclick="showSection('meetings')">🗓️ Meetings</div>
-    <div class="nav-link" onclick="showSection('tickets')">🎫 Tickets</div>
-    <div class="nav-link" onclick="showSection('devops')">🚀 DevOps</div>
-    <div class="nav-link" onclick="showSection('settings')">⚙️ Settings</div>
+
+    <div class="nav-section-label">Overview</div>
+    <div class="nav-link active" onclick="showSection('dashboard')">
+      <i class="fas fa-gauge-high nav-icon"></i><span>Dashboard</span>
+    </div>
+    <div class="nav-link" onclick="showSection('team')">
+      <i class="fas fa-users nav-icon"></i><span>My Team</span>
+    </div>
+    <div class="nav-link" onclick="showSection('reports')">
+      <i class="fas fa-chart-bar nav-icon"></i><span>Reports</span>
+    </div>
+
+    <div class="nav-divider"></div>
+    <div class="nav-section-label">Planning</div>
+    <div class="nav-link" onclick="showSection('planning')">
+      <i class="fas fa-map nav-icon"></i><span>Plan Project</span>
+    </div>
+    <div class="nav-link" onclick="showSection('workplans')">
+      <i class="fas fa-clipboard-check nav-icon"></i><span>Work Plans</span>
+      <span id="workplan-badge" style="margin-left:auto;background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;display:none;">0</span>
+    </div>
+    <div class="nav-link" onclick="showSection('projects')">
+      <i class="fas fa-diagram-project nav-icon"></i><span>Projects</span>
+    </div>
+
+    <div class="nav-divider"></div>
+    <div class="nav-section-label">Work</div>
+    <div class="nav-link" onclick="showSection('tickets')">
+      <i class="fas fa-ticket nav-icon"></i><span>Tickets</span>
+    </div>
+    <div class="nav-link" onclick="showSection('bugs')">
+      <i class="fas fa-bug nav-icon"></i><span>Bug Tracker</span>
+    </div>
+    <div class="nav-link" onclick="showSection('ask')">
+      <i class="fas fa-comments nav-icon"></i><span>Ask Team</span>
+    </div>
+
+    <div class="nav-divider"></div>
+    <div class="nav-section-label">Infrastructure</div>
+    <div class="nav-link" onclick="showSection('devops')">
+      <i class="fas fa-rocket nav-icon"></i><span>DevOps</span>
+    </div>
+    <div class="nav-link" onclick="showSection('meetings')">
+      <i class="fas fa-calendar-days nav-icon"></i><span>Meetings</span>
+    </div>
+    <div class="nav-link" onclick="showSection('settings')">
+      <i class="fas fa-gear nav-icon"></i><span>Settings</span>
+    </div>
+
   </div>
 
   <div class="sidebar-bottom">
@@ -1102,9 +1166,10 @@
 
       <!-- Tabs -->
       <div style="display: flex; gap: 12px; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
-        <button class="btn btn-secondary" onclick="switchReportTab('team')" id="tab-team-btn">📊 Team</button>
-        <button class="btn btn-secondary" onclick="switchReportTab('individual')" id="tab-individual-btn">👤 Individual</button>
-        <button class="btn btn-secondary" onclick="switchReportTab('activity')" id="tab-activity-btn">📈 Activity</button>
+        <button class="btn btn-secondary" onclick="switchReportTab('team')" id="tab-team-btn"><i class="fas fa-chart-bar" style="margin-right:5px"></i>Team</button>
+        <button class="btn btn-secondary" onclick="switchReportTab('individual')" id="tab-individual-btn"><i class="fas fa-user" style="margin-right:5px"></i>Individual</button>
+        <button class="btn btn-secondary" onclick="switchReportTab('activity')" id="tab-activity-btn"><i class="fas fa-timeline" style="margin-right:5px"></i>Activity</button>
+        <button class="btn btn-secondary" onclick="switchReportTab('workplan-stats')" id="tab-workplan-stats-btn"><i class="fas fa-clipboard-check" style="margin-right:5px"></i>Work Plans</button>
       </div>
 
       <!-- Team Report -->
@@ -1200,6 +1265,73 @@
             <div id="activity-timeline">
               <div class="text-muted" style="text-align: center;">Loading…</div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Work Plans Stats Tab -->
+      <div id="report-workplan-stats" class="report-tab">
+        <div class="grid-2" style="margin-bottom:16px">
+          <div class="panel">
+            <div class="panel-header"><h2><i class="fas fa-circle-check" style="color:var(--green);margin-right:8px"></i>Approval Stats</h2></div>
+            <div class="panel-body">
+              <div style="display:flex;gap:16px;flex-wrap:wrap">
+                <div style="text-align:center;flex:1;min-width:80px">
+                  <div style="font-size:36px;font-weight:700;color:var(--yellow)" id="wps-pending">—</div>
+                  <div style="font-size:12px;color:var(--text-secondary)">Pending Review</div>
+                </div>
+                <div style="text-align:center;flex:1;min-width:80px">
+                  <div style="font-size:36px;font-weight:700;color:var(--green)" id="wps-approved">—</div>
+                  <div style="font-size:12px;color:var(--text-secondary)">Approved</div>
+                </div>
+                <div style="text-align:center;flex:1;min-width:80px">
+                  <div style="font-size:36px;font-weight:700;color:var(--red)" id="wps-rejected">—</div>
+                  <div style="font-size:12px;color:var(--text-secondary)">Rejected</div>
+                </div>
+                <div style="text-align:center;flex:1;min-width:80px">
+                  <div style="font-size:36px;font-weight:700;color:var(--accent)" id="wps-rate">—</div>
+                  <div style="font-size:12px;color:var(--text-secondary)">Approval Rate</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-header"><h2><i class="fas fa-rotate-right" style="color:var(--accent);margin-right:8px"></i>Revision Stats</h2></div>
+            <div class="panel-body">
+              <div style="display:flex;gap:16px;flex-wrap:wrap">
+                <div style="text-align:center;flex:1;min-width:80px">
+                  <div style="font-size:36px;font-weight:700;color:var(--accent)" id="wps-revisions">—</div>
+                  <div style="font-size:12px;color:var(--text-secondary)">Total Revisions</div>
+                </div>
+                <div style="text-align:center;flex:1;min-width:80px">
+                  <div style="font-size:36px;font-weight:700;color:var(--text)" id="wps-avg-rev">—</div>
+                  <div style="font-size:12px;color:var(--text-secondary)">Avg Revisions</div>
+                </div>
+                <div style="text-align:center;flex:1;min-width:80px">
+                  <div style="font-size:36px;font-weight:700;color:var(--red)" id="wps-blocked">—</div>
+                  <div style="font-size:12px;color:var(--text-secondary)">Max Revisions Hit</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header"><h2>Work Plan Activity by Agent</h2></div>
+          <div class="panel-body" style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:13px">
+              <thead>
+                <tr style="border-bottom:2px solid var(--border)">
+                  <th style="padding:10px 16px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary)">Agent</th>
+                  <th style="padding:10px 16px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary)">Total Plans</th>
+                  <th style="padding:10px 16px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary)">Approved</th>
+                  <th style="padding:10px 16px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary)">Rejected</th>
+                  <th style="padding:10px 16px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary)">Revisions</th>
+                  <th style="padding:10px 16px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary)">Approval Rate</th>
+                </tr>
+              </thead>
+              <tbody id="wps-agent-table"></tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -1792,6 +1924,207 @@
   </div>
 </div>
 
+<!-- ═══════════════════════════════════════════════════════════════
+     SECTION: PLAN A PROJECT
+     ═══════════════════════════════════════════════════════════════ -->
+<div id="planning" class="section">
+  <div class="grid-2" style="align-items: start;">
+
+    <!-- Left: Create / Upload -->
+    <div>
+      <div class="panel">
+        <div class="panel-header">
+          <h2><i class="fas fa-wand-magic-sparkles" style="color:var(--accent);margin-right:8px"></i>Generate Project Plan</h2>
+          <p style="color:var(--text-secondary);font-size:13px;margin:4px 0 0">Manager will scan your project and produce a full phased plan for your review.</p>
+        </div>
+        <div class="panel-body">
+          <div class="form-group">
+            <label>Project Goal <span style="color:var(--red)">*</span></label>
+            <textarea id="plan-goal" rows="4" placeholder="Describe what you want to build or improve…" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:10px;font-size:13px;resize:vertical;font-family:inherit;box-sizing:border-box"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Project Source <span style="color:var(--text-secondary);font-weight:400">(optional)</span></label>
+            <input id="plan-source" type="text" placeholder="https://github.com/org/repo  or  https://myapp.com  or  /app/sandbox/project" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:10px;font-size:13px;box-sizing:border-box" />
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:4px">GitHub URL · Production URL · Local folder path</div>
+          </div>
+          <div class="form-group">
+            <label>Attach Files / Images <span style="color:var(--text-secondary);font-weight:400">(optional)</span></label>
+            <input id="plan-files" type="file" multiple accept="*/*" style="display:none" onchange="updateFileList('plan-files','plan-file-list')" />
+            <div onclick="document.getElementById('plan-files').click()" style="border:2px dashed var(--border);border-radius:8px;padding:20px;text-align:center;cursor:pointer;color:var(--text-secondary);font-size:13px;transition:border-color 0.2s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+              <i class="fas fa-cloud-arrow-up" style="font-size:22px;margin-bottom:8px;display:block;color:var(--accent)"></i>
+              Drop files here or click to browse<br>
+              <span style="font-size:11px">Requirements docs, wireframes, screenshots, architecture diagrams</span>
+            </div>
+            <div id="plan-file-list" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px"></div>
+          </div>
+          <button class="btn" onclick="createPlan()" id="plan-btn" style="width:100%">
+            <i class="fas fa-wand-magic-sparkles" style="margin-right:6px"></i>Generate Plan
+          </button>
+          <div id="plan-result" style="margin-top:12px;display:none"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Plans list -->
+    <div>
+      <div class="panel">
+        <div class="panel-header" style="display:flex;justify-content:space-between;align-items:center">
+          <h2>Project Plans</h2>
+          <button class="btn btn-secondary" onclick="loadPlans()" style="padding:4px 10px;font-size:12px"><i class="fas fa-rotate-right"></i></button>
+        </div>
+        <div id="plans-list" style="padding:0">
+          <div style="padding:24px;text-align:center;color:var(--text-secondary);font-size:13px">
+            <i class="fas fa-map" style="font-size:28px;display:block;margin-bottom:8px;opacity:0.4"></i>
+            No plans yet — generate one on the left.
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Plan Detail (shown when a plan is selected) -->
+  <div id="plan-detail" style="display:none;margin-top:20px">
+    <div class="panel">
+      <div class="panel-header" style="display:flex;justify-content:space-between;align-items:center">
+        <h2 id="plan-detail-name">Plan Details</h2>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-secondary" onclick="closePlanDetail()"><i class="fas fa-xmark"></i></button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="grid-2" style="margin-bottom:16px">
+          <div>
+            <div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px">Goal</div>
+            <div id="plan-detail-goal" style="font-size:13px"></div>
+          </div>
+          <div>
+            <div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px">Timeline</div>
+            <div id="plan-detail-timeline" style="font-size:22px;font-weight:700;color:var(--accent)"></div>
+          </div>
+        </div>
+
+        <div id="plan-detail-phases" style="margin-bottom:16px"></div>
+
+        <div class="grid-2">
+          <div>
+            <div style="font-size:12px;font-weight:600;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary)">Deliverables</div>
+            <div id="plan-detail-deliverables"></div>
+          </div>
+          <div>
+            <div style="font-size:12px;font-weight:600;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary)">Risks</div>
+            <div id="plan-detail-risks"></div>
+          </div>
+        </div>
+
+        <div style="margin-top:16px;padding:12px;background:rgba(88,166,255,0.06);border:1px solid rgba(88,166,255,0.2);border-radius:8px">
+          <div style="font-size:12px;font-weight:600;margin-bottom:6px;color:var(--accent)"><i class="fas fa-circle-check" style="margin-right:6px"></i>Definition of Done</div>
+          <div id="plan-detail-dod" style="font-size:13px;color:var(--text-secondary)"></div>
+        </div>
+
+        <div style="margin-top:20px;display:flex;gap:12px;justify-content:flex-end">
+          <textarea id="plan-feedback" rows="2" placeholder="Revision notes for manager (required if revising or rejecting)…" style="flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px;font-size:12px;resize:none;font-family:inherit"></textarea>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <button class="btn" onclick="approvePlan()" style="background:var(--green);color:#000;min-width:100px">
+              <i class="fas fa-circle-check" style="margin-right:6px"></i>Approve
+            </button>
+            <button class="btn btn-secondary" onclick="revisePlan()" style="min-width:100px">
+              <i class="fas fa-rotate-right" style="margin-right:6px"></i>Revise
+            </button>
+            <button class="btn btn-secondary" onclick="rejectPlan()" style="color:var(--red);border-color:var(--red);min-width:100px">
+              <i class="fas fa-ban" style="margin-right:6px"></i>Reject
+            </button>
+          </div>
+        </div>
+        <div id="plan-approve-result" style="margin-top:10px;display:none"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SECTION: WORK PLAN REVIEWS
+     ═══════════════════════════════════════════════════════════════ -->
+<div id="workplans" class="section">
+  <div class="panel">
+    <div class="panel-header" style="display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <h2><i class="fas fa-clipboard-check" style="color:var(--accent);margin-right:8px"></i>Employee Work Plans</h2>
+        <p style="color:var(--text-secondary);font-size:13px;margin:4px 0 0">
+          Each agent submits a work plan before starting a task. Review and approve or reject below.
+        </p>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select id="workplan-filter" onchange="loadWorkPlans()" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:12px">
+          <option value="">All statuses</option>
+          <option value="pending_manager_review">Pending Review</option>
+          <option value="approved">Approved</option>
+          <option value="rejected">Rejected</option>
+        </select>
+        <button class="btn btn-secondary" onclick="loadWorkPlans()" style="padding:6px 10px;font-size:12px"><i class="fas fa-rotate-right"></i></button>
+      </div>
+    </div>
+    <div id="workplans-body" style="padding:0">
+      <div style="padding:32px;text-align:center;color:var(--text-secondary)">
+        <i class="fas fa-clipboard" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.35"></i>
+        No work plans to review.
+      </div>
+    </div>
+  </div>
+
+  <!-- Inline review panel -->
+  <div id="workplan-review-panel" style="display:none;margin-top:20px">
+    <div class="panel" style="border-color:var(--accent)">
+      <div class="panel-header">
+        <h2 id="wp-review-title">Review Work Plan</h2>
+        <div id="wp-review-agent" style="font-size:12px;color:var(--text-secondary);margin-top:2px"></div>
+      </div>
+      <div class="panel-body">
+        <div class="grid-2">
+          <div>
+            <div class="form-group">
+              <label>Approach</label>
+              <div id="wp-review-approach" style="font-size:13px;color:var(--text-secondary);line-height:1.6"></div>
+            </div>
+            <div class="form-group">
+              <label>Deliverables</label>
+              <div id="wp-review-deliverables"></div>
+            </div>
+            <div class="form-group">
+              <label>Questions for Manager</label>
+              <div id="wp-review-questions" style="font-size:13px;color:var(--yellow)"></div>
+            </div>
+          </div>
+          <div>
+            <div class="form-group">
+              <label>Estimate</label>
+              <div id="wp-review-estimate" style="font-size:24px;font-weight:700;color:var(--accent)"></div>
+            </div>
+            <div class="form-group">
+              <label>Risks / Blockers</label>
+              <div id="wp-review-risks" style="font-size:13px;color:var(--text-secondary)"></div>
+            </div>
+          </div>
+        </div>
+        <div class="form-group" style="margin-top:8px">
+          <label>Feedback / Instructions <span style="color:var(--text-secondary);font-weight:400">(required if rejecting)</span></label>
+          <textarea id="wp-feedback" rows="3" placeholder="Add notes, corrections, or revision instructions for the agent…" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:10px;font-size:13px;resize:none;font-family:inherit;box-sizing:border-box"></textarea>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end">
+          <button class="btn btn-secondary" onclick="closeWorkplanReview()">Cancel</button>
+          <button class="btn btn-secondary" onclick="submitWorkplanReview('rejected')" style="color:var(--red);border-color:var(--red)">
+            <i class="fas fa-ban" style="margin-right:6px"></i>Reject & Revise
+          </button>
+          <button class="btn" onclick="submitWorkplanReview('approved')" style="background:var(--green);color:#000">
+            <i class="fas fa-circle-check" style="margin-right:6px"></i>Approve
+          </button>
+        </div>
+        <div id="wp-review-result" style="margin-top:10px;display:none"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Task Detail Modal -->
 <div class="modal" id="task-detail-modal">
   <div class="modal-content">
@@ -2033,6 +2366,16 @@ function getEmployeeByRole(role) {
   return EMPLOYEES.find(e => e.role === role);
 }
 
+function escHtml(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function showSection(sectionId) {
   // Hide all
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
@@ -2047,26 +2390,30 @@ function showSection(sectionId) {
 
     // Update header title
     const titles = {
-      dashboard: 'Dashboard',
-      team: 'My Team',
-      projects: 'Projects',
-      bugs: 'Bug Tracker',
-      reports: 'Reports',
-      ask: 'Ask Team',
-      meetings: 'Team Meetings',
-      tickets: 'Ticket Manager',
-      devops: 'DevOps Management',
-      settings: 'Settings',
+      dashboard:  'Dashboard',
+      team:       'My Team',
+      projects:   'Projects',
+      bugs:       'Bug Tracker',
+      reports:    'Reports',
+      ask:        'Ask Team',
+      meetings:   'Team Meetings',
+      tickets:    'Ticket Manager',
+      devops:     'DevOps Management',
+      settings:   'Settings',
+      planning:   'Plan a Project',
+      workplans:  'Work Plan Reviews',
     };
     document.getElementById('section-title').textContent = titles[sectionId] || sectionId;
 
     // Load section-specific data
-    if (sectionId === 'projects') renderKanban();
-    if (sectionId === 'bugs') renderBugTracker();
-    if (sectionId === 'reports') renderTeamReport();
-    if (sectionId === 'ask') populateAskSelect();
-    if (sectionId === 'tickets') loadTickets();
-    if (sectionId === 'devops') loadDevOps();
+    if (sectionId === 'projects')  renderKanban();
+    if (sectionId === 'bugs')      renderBugTracker();
+    if (sectionId === 'reports')   renderTeamReport();
+    if (sectionId === 'ask')       populateAskSelect();
+    if (sectionId === 'tickets')   loadTickets();
+    if (sectionId === 'devops')    loadDevOps();
+    if (sectionId === 'workplans') loadWorkPlans();
+    if (sectionId === 'planning')  loadPlans();
   }
 }
 
@@ -2097,7 +2444,7 @@ document.addEventListener('click', (e) => {
 async function fetchApi(path, method = 'GET', body = null) {
   const opts = { method, headers: { 'Content-Type': 'application/json' } }
   if (body) opts.body = JSON.stringify(body)
-  const r = await fetch('http://localhost:8000' + path, opts)
+  const r = await fetch(`${API_URL}${path}`, opts)
   if (!r.ok) throw new Error(`HTTP ${r.status}`)
   return r.json()
 }
@@ -2545,8 +2892,80 @@ function switchReportTab(tab) {
   document.querySelectorAll('[id^="tab-"][id$="-btn"]').forEach(btn => btn.style.opacity = '0.6');
   document.getElementById(`tab-${tab}-btn`).style.opacity = '1';
 
-  if (tab === 'individual') populateIndividualSelect();
-  if (tab === 'activity') renderActivityTimeline();
+  if (tab === 'individual')      populateIndividualSelect();
+  if (tab === 'activity')        renderActivityTimeline();
+  if (tab === 'workplan-stats')  loadWorkPlanStats();
+}
+
+async function loadWorkPlanStats() {
+  try {
+    const data = await fetchApi('/workplans/all');
+    renderWorkPlanStats(data.workplans || []);
+  } catch (e) {
+    document.getElementById('wps-agent-table').innerHTML =
+      `<tr><td colspan="6" style="padding:16px;color:var(--red);text-align:center">${e.message}</td></tr>`;
+  }
+}
+
+function renderWorkPlanStats(workplans) {
+  const pending  = workplans.filter(w => w.status === 'pending_manager_review').length;
+  const approved = workplans.filter(w => w.status === 'approved' || w.status === 'approved_auto').length;
+  const rejected = workplans.filter(w => w.status === 'rejected').length;
+  const total    = approved + rejected;
+  const rate     = total > 0 ? Math.round((approved / total) * 100) + '%' : '—';
+
+  const totalRevisions = workplans.reduce((s, w) => s + (w.revision_count || 0), 0);
+  const avgRev         = workplans.length > 0 ? (totalRevisions / workplans.length).toFixed(1) : '—';
+  const maxRevHit      = workplans.filter(w => (w.revision_count || 0) >= 3).length;
+
+  document.getElementById('wps-pending').textContent  = pending;
+  document.getElementById('wps-approved').textContent = approved;
+  document.getElementById('wps-rejected').textContent = rejected;
+  document.getElementById('wps-rate').textContent     = rate;
+  document.getElementById('wps-revisions').textContent = totalRevisions;
+  document.getElementById('wps-avg-rev').textContent  = avgRev;
+  document.getElementById('wps-blocked').textContent  = maxRevHit;
+
+  // Per-agent breakdown
+  const byAgent = {};
+  workplans.forEach(w => {
+    const role = w.role || 'unknown';
+    if (!byAgent[role]) byAgent[role] = { total: 0, approved: 0, rejected: 0, revisions: 0 };
+    byAgent[role].total++;
+    if (w.status === 'approved' || w.status === 'approved_auto') byAgent[role].approved++;
+    if (w.status === 'rejected') byAgent[role].rejected++;
+    byAgent[role].revisions += (w.revision_count || 0);
+  });
+
+  const tbody = document.getElementById('wps-agent-table');
+  const rows  = Object.entries(byAgent).sort((a, b) => b[1].total - a[1].total);
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="padding:24px;text-align:center;color:var(--text-secondary)">No work plan data yet.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(([role, s]) => {
+    const r    = s.approved + s.rejected;
+    const rate = r > 0 ? Math.round((s.approved / r) * 100) : null;
+    const barW = rate !== null ? rate : 0;
+    const barColor = barW >= 80 ? 'var(--green)' : barW >= 50 ? 'var(--yellow)' : 'var(--red)';
+    return `<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:12px 16px;font-weight:600;color:var(--accent)">${escHtml(role)}</td>
+      <td style="padding:12px 16px;text-align:center">${s.total}</td>
+      <td style="padding:12px 16px;text-align:center;color:var(--green)">${s.approved}</td>
+      <td style="padding:12px 16px;text-align:center;color:var(--red)">${s.rejected}</td>
+      <td style="padding:12px 16px;text-align:center;color:var(--accent)">${s.revisions}</td>
+      <td style="padding:12px 16px">
+        ${rate !== null
+          ? `<div style="display:flex;align-items:center;gap:8px">
+              <div style="flex:1;background:var(--border);border-radius:4px;height:6px">
+                <div style="width:${barW}%;background:${barColor};height:6px;border-radius:4px;transition:width 0.4s"></div>
+              </div>
+              <span style="font-size:12px;color:${barColor};min-width:34px;text-align:right">${rate}%</span>
+            </div>`
+          : '<span style="color:var(--text-secondary);font-size:12px">—</span>'}
+      </td>
+    </tr>`;
+  }).join('');
 }
 
 function renderTeamReport() {
@@ -2822,6 +3241,7 @@ async function init() {
   renderEmployeeCards();
   renderSettingsAgents();
   populateIndividualSelect();
+  refreshWorkplanBadge();
 }
 
 document.addEventListener('DOMContentLoaded', init);
@@ -3188,6 +3608,433 @@ async function raiseIncident() {
     alert('❌ Failed to raise incident');
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PLANNING SECTION
+// ═══════════════════════════════════════════════════════════════════════════
+
+let _currentPlanId = null;
+
+function updateFileList(inputId, listId) {
+  const input = document.getElementById(inputId);
+  const list  = document.getElementById(listId);
+  if (!input || !list) return;
+  const files = Array.from(input.files);
+  if (!files.length) { list.innerHTML = ''; return; }
+  list.innerHTML = files.map(f =>
+    `<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(88,166,255,0.12);border:1px solid rgba(88,166,255,0.25);border-radius:4px;padding:3px 8px;font-size:11px;color:var(--text)">
+      <i class="fas fa-file" style="color:var(--accent);font-size:10px"></i>${f.name}
+    </span>`
+  ).join('');
+}
+
+async function loadPlans() {
+  const el = document.getElementById('plans-list');
+  el.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-secondary)"><i class="fas fa-circle-notch fa-spin"></i> Loading…</div>';
+  try {
+    const data = await fetchApi('/plans');
+    renderPlansList(data.plans || []);
+  } catch (e) {
+    el.innerHTML = `<div style="padding:16px;color:var(--red);font-size:13px">Failed to load plans: ${e.message}</div>`;
+  }
+}
+
+function renderPlansList(plans) {
+  const el = document.getElementById('plans-list');
+  if (!plans.length) {
+    el.innerHTML = `<div style="padding:32px;text-align:center;color:var(--text-secondary);font-size:13px">
+      <i class="fas fa-map" style="font-size:28px;display:block;margin-bottom:8px;opacity:0.4"></i>
+      No plans yet — generate one on the left.
+    </div>`;
+    return;
+  }
+  const STATUS_COLOR = { draft:'var(--text-secondary)', approved:'var(--green)', rejected:'var(--red)', executing:'var(--accent)', revision_requested:'var(--yellow)' };
+  el.innerHTML = plans.map(p => {
+    const color = STATUS_COLOR[p.status] || 'var(--text-secondary)';
+    return `<div onclick="openPlanDetail('${p.plan_id}')" style="padding:14px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.15s" onmouseover="this.style.background='rgba(88,166,255,0.05)'" onmouseout="this.style.background='transparent'">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-size:13px;font-weight:600;max-width:70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(p.goal || 'Untitled plan')}</div>
+        <span style="font-size:11px;padding:2px 8px;border-radius:10px;background:${color}22;color:${color};border:1px solid ${color}44;white-space:nowrap">${p.status}</span>
+      </div>
+      <div style="display:flex;gap:12px;margin-top:4px;font-size:11px;color:var(--text-secondary)">
+        <span><i class="fas fa-hashtag" style="margin-right:3px"></i>${p.plan_id.slice(0,8)}</span>
+        ${p.total_duration_weeks ? `<span><i class="fas fa-clock" style="margin-right:3px"></i>${p.total_duration_weeks}w</span>` : ''}
+        ${p.created_at ? `<span><i class="fas fa-calendar" style="margin-right:3px"></i>${formatDate(p.created_at)}</span>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function openPlanDetail(planId) {
+  _currentPlanId = planId;
+  document.getElementById('plan-detail').style.display = 'block';
+  document.getElementById('plan-detail-name').textContent = 'Loading…';
+  document.getElementById('plan-detail-goal').textContent = '';
+  document.getElementById('plan-detail-timeline').textContent = '';
+  document.getElementById('plan-detail-phases').innerHTML = '';
+  document.getElementById('plan-detail-deliverables').innerHTML = '';
+  document.getElementById('plan-detail-risks').innerHTML = '';
+  document.getElementById('plan-detail-dod').textContent = '';
+  document.getElementById('plan-approve-result').style.display = 'none';
+  document.getElementById('plan-feedback').value = '';
+  document.getElementById('plan-detail').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  try {
+    const plan = await fetchApi(`/plan/${planId}`);
+    renderPlanDetail(plan);
+  } catch (e) {
+    document.getElementById('plan-detail-name').textContent = 'Failed to load plan';
+  }
+}
+
+function renderPlanDetail(plan) {
+  document.getElementById('plan-detail-name').textContent = plan.name || plan.goal || 'Project Plan';
+  document.getElementById('plan-detail-goal').textContent = plan.goal || '—';
+  document.getElementById('plan-detail-timeline').textContent = plan.total_duration_weeks
+    ? `${plan.total_duration_weeks} weeks`
+    : (plan.timeline || '—');
+
+  // Phases
+  const phases = plan.phases || [];
+  const phasesEl = document.getElementById('plan-detail-phases');
+  if (phases.length) {
+    phasesEl.innerHTML = `
+      <div style="font-size:12px;font-weight:600;margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary)">Phases</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        ${phases.map((ph, i) => `
+          <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">
+            <div style="padding:10px 14px;background:rgba(88,166,255,0.06);display:flex;justify-content:space-between;align-items:center">
+              <div style="font-weight:600;font-size:13px"><span style="color:var(--accent);margin-right:6px">${i+1}.</span>${escHtml(ph.name || ph.phase_name || '')}</div>
+              <span style="font-size:11px;color:var(--text-secondary)">${ph.duration_weeks ? ph.duration_weeks+'w' : ''}</span>
+            </div>
+            ${ph.description ? `<div style="padding:8px 14px;font-size:12px;color:var(--text-secondary)">${escHtml(ph.description)}</div>` : ''}
+            ${(ph.tasks || ph.tickets || []).length ? `
+              <div style="padding:6px 14px 10px">
+                ${(ph.tasks || ph.tickets).map(t => `
+                  <div style="font-size:12px;color:var(--text-secondary);padding:2px 0;display:flex;gap:6px;align-items:flex-start">
+                    <i class="fas fa-circle-dot" style="color:var(--accent);margin-top:3px;font-size:9px;flex-shrink:0"></i>
+                    <span>${escHtml(typeof t === 'string' ? t : (t.title || JSON.stringify(t)))}</span>
+                  </div>`).join('')}
+              </div>` : ''}
+          </div>`).join('')}
+      </div>`;
+  } else {
+    phasesEl.innerHTML = '';
+  }
+
+  // Deliverables
+  const deliverables = plan.deliverables || [];
+  document.getElementById('plan-detail-deliverables').innerHTML = deliverables.length
+    ? deliverables.map(d => `<div style="font-size:12px;color:var(--text-secondary);padding:3px 0;display:flex;gap:6px;align-items:flex-start"><i class="fas fa-box" style="color:var(--green);margin-top:2px;font-size:10px;flex-shrink:0"></i><span>${escHtml(d)}</span></div>`).join('')
+    : '<span style="font-size:12px;color:var(--text-secondary)">—</span>';
+
+  // Risks
+  const risks = plan.risks || [];
+  document.getElementById('plan-detail-risks').innerHTML = risks.length
+    ? risks.map(r => `<div style="font-size:12px;color:var(--text-secondary);padding:3px 0;display:flex;gap:6px;align-items:flex-start"><i class="fas fa-triangle-exclamation" style="color:var(--yellow);margin-top:2px;font-size:10px;flex-shrink:0"></i><span>${escHtml(typeof r === 'string' ? r : (r.description || r.risk || JSON.stringify(r)))}</span></div>`).join('')
+    : '<span style="font-size:12px;color:var(--text-secondary)">—</span>';
+
+  // DoD
+  const dod = plan.definition_of_done || plan.dod || '';
+  document.getElementById('plan-detail-dod').textContent = Array.isArray(dod) ? dod.join(' · ') : (dod || 'Not specified');
+}
+
+async function createPlan() {
+  const goal = document.getElementById('plan-goal').value.trim();
+  if (!goal) { alert('Please enter a project goal.'); return; }
+
+  const btn    = document.getElementById('plan-btn');
+  const result = document.getElementById('plan-result');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-circle-notch fa-spin" style="margin-right:6px"></i>Generating…';
+  result.style.display = 'block';
+  result.style.color   = 'var(--text-secondary)';
+  result.textContent   = 'Manager is scanning the project and generating a plan. This may take 30–60 seconds…';
+
+  try {
+    const filesInput = document.getElementById('plan-files');
+    const files = filesInput ? Array.from(filesInput.files) : [];
+    const source = document.getElementById('plan-source').value.trim();
+
+    let data;
+    if (files.length) {
+      // Multipart upload
+      const form = new FormData();
+      form.append('goal', goal);
+      if (source) form.append('project_source', source);
+      files.forEach(f => form.append('files', f));
+      const res = await fetch(`${API_URL}/plan/create/upload`, { method: 'POST', body: form });
+      data = await res.json();
+      if (!res.ok) throw new Error(data.detail || JSON.stringify(data));
+    } else {
+      data = await fetchApi('/plan/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ goal, project_source: source || null }),
+      });
+    }
+
+    if (data.error) throw new Error(data.error);
+
+    result.textContent = '✅ Plan generated! Scroll down to review it.';
+    result.style.color = 'var(--green)';
+    if (filesInput) filesInput.value = '';
+    document.getElementById('plan-file-list').innerHTML = '';
+    document.getElementById('plan-goal').value = '';
+    document.getElementById('plan-source').value = '';
+    await loadPlans();
+    // Auto-open the new plan
+    if (data.plan_id) openPlanDetail(data.plan_id);
+  } catch (e) {
+    result.textContent = `❌ ${e.message}`;
+    result.style.color = 'var(--red)';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-wand-magic-sparkles" style="margin-right:6px"></i>Generate Plan';
+  }
+}
+
+async function approvePlan() {
+  if (!_currentPlanId) return;
+  await _planAction('approve', null);
+}
+
+async function revisePlan() {
+  if (!_currentPlanId) return;
+  const feedback = document.getElementById('plan-feedback').value.trim();
+  if (!feedback) { alert('Please enter revision notes for the manager.'); return; }
+  await _planAction('revise', feedback);
+}
+
+async function rejectPlan() {
+  if (!_currentPlanId) return;
+  const feedback = document.getElementById('plan-feedback').value.trim();
+  await _planAction('reject', feedback || null);
+}
+
+async function _planAction(action, feedback) {
+  const resultEl = document.getElementById('plan-approve-result');
+  resultEl.style.display = 'block';
+  resultEl.style.color   = 'var(--text-secondary)';
+  resultEl.textContent   = action === 'approve' ? 'Approving and creating tickets…' : 'Submitting…';
+
+  try {
+    const body = { action };
+    if (feedback) body.feedback = feedback;
+    const data = await fetchApi(`/plan/${_currentPlanId}/approve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if (action === 'approve') {
+      const count = data.tickets_created || 0;
+      resultEl.textContent = `✅ Plan approved! ${count} ticket${count !== 1 ? 's' : ''} created and dispatched to agents.`;
+      resultEl.style.color = 'var(--green)';
+      setTimeout(() => { loadPlans(); loadTickets(); }, 1500);
+    } else if (action === 'revise') {
+      resultEl.textContent = '✅ Revision request sent. A new plan has been created — check the list.';
+      resultEl.style.color = 'var(--accent)';
+      document.getElementById('plan-feedback').value = '';
+      setTimeout(() => { loadPlans(); closePlanDetail(); }, 1800);
+      if (data.new_plan && data.new_plan.plan_id) {
+        setTimeout(() => openPlanDetail(data.new_plan.plan_id), 2000);
+      }
+    } else {
+      resultEl.textContent = '✅ Plan rejected.';
+      resultEl.style.color = 'var(--red)';
+      setTimeout(() => { loadPlans(); closePlanDetail(); }, 1200);
+    }
+  } catch (e) {
+    resultEl.textContent = `❌ ${e.message}`;
+    resultEl.style.color = 'var(--red)';
+  }
+}
+
+function closePlanDetail() {
+  _currentPlanId = null;
+  document.getElementById('plan-detail').style.display = 'none';
+  document.getElementById('plan-feedback').value = '';
+  document.getElementById('plan-approve-result').style.display = 'none';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WORK PLANS SECTION
+// ═══════════════════════════════════════════════════════════════════════════
+
+let _currentWorkplanRole    = null;
+let _currentWorkplanTaskId  = null;
+
+async function loadWorkPlans() {
+  const el     = document.getElementById('workplans-body');
+  const filter = document.getElementById('workplan-filter')?.value || '';
+  el.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-secondary)"><i class="fas fa-circle-notch fa-spin"></i> Loading…</div>';
+  try {
+    const url  = '/workplans/all' + (filter ? `?status=${encodeURIComponent(filter)}` : '');
+    const data = await fetchApi(url);
+    renderWorkPlansList(data.workplans || []);
+  } catch (e) {
+    el.innerHTML = `<div style="padding:16px;color:var(--red);font-size:13px">Failed to load work plans: ${e.message}</div>`;
+  }
+}
+
+const WP_STATUS_COLOR = {
+  pending_manager_review: 'var(--yellow)',
+  approved:  'var(--green)',
+  rejected:  'var(--red)',
+  approved_auto: 'var(--text-secondary)',
+};
+
+function renderWorkPlansList(plans) {
+  const el = document.getElementById('workplans-body');
+  if (!plans.length) {
+    el.innerHTML = `<div style="padding:32px;text-align:center;color:var(--text-secondary)">
+      <i class="fas fa-clipboard" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.35"></i>No work plans to review.
+    </div>`;
+    return;
+  }
+  el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px">
+    <thead>
+      <tr style="border-bottom:2px solid var(--border);text-align:left">
+        <th style="padding:10px 16px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary);font-weight:600">Agent</th>
+        <th style="padding:10px 16px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary);font-weight:600">Task</th>
+        <th style="padding:10px 16px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary);font-weight:600">Estimate</th>
+        <th style="padding:10px 16px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary);font-weight:600">Status</th>
+        <th style="padding:10px 16px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary);font-weight:600">Revision</th>
+        <th style="padding:10px 16px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary);font-weight:600">Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${plans.map(wp => {
+        const status = wp.status || 'unknown';
+        const color  = WP_STATUS_COLOR[status] || 'var(--text-secondary)';
+        const isPending = status === 'pending_manager_review';
+        const plan = wp.plan || {};
+        return `<tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:12px 16px;font-weight:600;color:var(--accent)">${escHtml(wp.role || '—')}</td>
+          <td style="padding:12px 16px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(plan.task_title || '')}">
+            <div style="font-size:13px">${escHtml(plan.task_title || wp.ticket_id || '—')}</div>
+            <div style="font-size:11px;color:var(--text-secondary)">${wp.task_id ? wp.task_id.slice(0,12) : ''}</div>
+          </td>
+          <td style="padding:12px 16px;color:var(--accent);font-weight:600">${escHtml(plan.estimate || '—')}</td>
+          <td style="padding:12px 16px">
+            <span style="font-size:11px;padding:2px 8px;border-radius:10px;background:${color}22;color:${color};border:1px solid ${color}44">${status.replace(/_/g,' ')}</span>
+          </td>
+          <td style="padding:12px 16px;text-align:center;color:var(--text-secondary)">${wp.revision_count || 0}</td>
+          <td style="padding:12px 16px">
+            ${isPending
+              ? `<button class="btn btn-secondary" onclick="openWorkplanReview('${escHtml(wp.role)}','${escHtml(wp.task_id)}')" style="padding:4px 10px;font-size:12px"><i class="fas fa-eye" style="margin-right:4px"></i>Review</button>`
+              : `<button class="btn btn-secondary" onclick="openWorkplanReview('${escHtml(wp.role)}','${escHtml(wp.task_id)}')" style="padding:4px 10px;font-size:12px;opacity:0.6"><i class="fas fa-eye" style="margin-right:4px"></i>View</button>`}
+          </td>
+        </tr>`;
+      }).join('')}
+    </tbody>
+  </table>`;
+}
+
+async function openWorkplanReview(role, taskId) {
+  _currentWorkplanRole   = role;
+  _currentWorkplanTaskId = taskId;
+
+  const panel = document.getElementById('workplan-review-panel');
+  panel.style.display = 'block';
+  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  document.getElementById('wp-review-title').textContent = 'Loading work plan…';
+  document.getElementById('wp-review-agent').textContent = '';
+  document.getElementById('wp-review-approach').textContent = '';
+  document.getElementById('wp-review-deliverables').innerHTML = '';
+  document.getElementById('wp-review-estimate').textContent = '';
+  document.getElementById('wp-review-risks').textContent = '';
+  document.getElementById('wp-review-questions').textContent = '';
+  document.getElementById('wp-feedback').value = '';
+  document.getElementById('wp-review-result').style.display = 'none';
+
+  try {
+    const wp   = await fetchApi(`/workplans/${encodeURIComponent(role)}/${encodeURIComponent(taskId)}`);
+    const plan = wp.plan || {};
+    document.getElementById('wp-review-title').textContent   = escHtml(plan.task_title || 'Work Plan Review');
+    document.getElementById('wp-review-agent').textContent   = `Agent: ${role}  ·  Task: ${taskId.slice(0,12)}  ·  Status: ${wp.status}`;
+    document.getElementById('wp-review-approach').textContent = plan.approach || '—';
+    document.getElementById('wp-review-estimate').textContent = plan.estimate || '—';
+    document.getElementById('wp-review-risks').textContent    = Array.isArray(plan.risks)
+      ? plan.risks.join(' · ') : (plan.risks || plan.blockers || '—');
+    document.getElementById('wp-review-questions').textContent = Array.isArray(plan.questions_for_manager)
+      ? plan.questions_for_manager.join('\n') : (plan.questions_for_manager || '—');
+
+    const deliverables = plan.deliverables || [];
+    document.getElementById('wp-review-deliverables').innerHTML = deliverables.length
+      ? deliverables.map(d => `<div style="font-size:12px;color:var(--text-secondary);padding:2px 0;display:flex;gap:6px"><i class="fas fa-check" style="color:var(--green);margin-top:2px;font-size:10px;flex-shrink:0"></i>${escHtml(d)}</div>`).join('')
+      : '<span style="font-size:12px;color:var(--text-secondary)">—</span>';
+
+    if (wp.feedback) {
+      document.getElementById('wp-feedback').value = wp.feedback;
+    }
+  } catch (e) {
+    document.getElementById('wp-review-title').textContent = `Failed to load: ${e.message}`;
+  }
+}
+
+async function submitWorkplanReview(action) {
+  if (!_currentWorkplanRole || !_currentWorkplanTaskId) return;
+  const feedback  = document.getElementById('wp-feedback').value.trim();
+  const resultEl  = document.getElementById('wp-review-result');
+
+  if (action === 'rejected' && !feedback) {
+    alert('Please provide feedback / revision instructions before rejecting.');
+    return;
+  }
+
+  resultEl.style.display  = 'block';
+  resultEl.style.color    = 'var(--text-secondary)';
+  resultEl.textContent    = 'Submitting…';
+
+  try {
+    const data = await fetchApi(`/workplans/${encodeURIComponent(_currentWorkplanRole)}/${encodeURIComponent(_currentWorkplanTaskId)}/review`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, feedback }),
+    });
+
+    if (action === 'approved') {
+      resultEl.textContent = '✅ Work plan approved — agent will proceed.';
+      resultEl.style.color = 'var(--green)';
+    } else {
+      resultEl.textContent = '✅ Rejected — agent will revise the plan based on your feedback.';
+      resultEl.style.color = 'var(--yellow)';
+    }
+    setTimeout(() => { loadWorkPlans(); closeWorkplanReview(); refreshWorkplanBadge(); }, 1400);
+  } catch (e) {
+    resultEl.textContent = `❌ ${e.message}`;
+    resultEl.style.color = 'var(--red)';
+  }
+}
+
+function closeWorkplanReview() {
+  _currentWorkplanRole   = null;
+  _currentWorkplanTaskId = null;
+  document.getElementById('workplan-review-panel').style.display = 'none';
+  document.getElementById('wp-review-result').style.display      = 'none';
+  document.getElementById('wp-feedback').value = '';
+}
+
+async function refreshWorkplanBadge() {
+  try {
+    const data  = await fetchApi('/workplans');   // pending only
+    const count = (data.workplans || []).length;
+    const badge = document.getElementById('workplan-badge');
+    if (!badge) return;
+    if (count > 0) {
+      badge.textContent    = count > 99 ? '99+' : count;
+      badge.style.display  = 'inline-flex';
+    } else {
+      badge.style.display  = 'none';
+    }
+  } catch (_) { /* silent */ }
+}
+
+// Auto-refresh workplan badge every 60 seconds
+setInterval(refreshWorkplanBadge, 60_000);
 </script>
 
 </body>

@@ -32,4 +32,13 @@ When auditing, check:
 5. Dark mode: check if CSS variables support light/dark switching; flag missing :dark-mode or @media (prefers-color-scheme)
 6. Component consistency: scan for duplicate/conflicting styles across files
 7. Accessibility: verify form labels, alt text, keyboard focus states, semantic HTML
-8. Responsive breakpoints: confirm mobile-first approach, consistent breakpoints"""
+8. Responsive breakpoints: confirm mobile-first approach, consistent breakpoints
+
+WHEN BLOCKED:
+- Need design system or brand guidelines → create manager task requesting the assets
+- Ambiguous requirement (e.g. "make it look better") → ask manager for specific success criteria
+
+DELIVERABLE CONTRACT — every task must end with:
+  DONE: <files audited/produced>
+  ISSUES: Critical X | Major Y | Minor Z
+  TASKS CREATED: <IDs of follow-up tasks>"""
