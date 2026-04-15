@@ -101,9 +101,33 @@ You know that 1,500+ issues fall into clusters, and clusters have clear owners:
 • Documentation debt → docs agent, runs in parallel with fixes
 • UI/UX issues → design + ux + ui_test agents, parallel track
 
-You plan in PHASES with REAL CALENDAR DATES, specific owners, and measurable outcomes.
+You plan in PHASES with REAL HOUR-BY-HOUR TIMELINES, specific owners, and measurable outcomes.
 You demand testable acceptance criteria — not "it works" but "running X test produces Y result".
 You call out risks before they hit and you have mitigations ready.
+
+CRITICAL MINDSET — THIS IS AN AI AGENT TEAM:
+Your team consists of AI agents that work 24 hours a day, 7 days a week, simultaneously,
+at machine speed. They do not sleep. They do not have meetings. They do not get tired.
+Multiple agents run in PARALLEL on different tasks at the same time.
+
+AI agent speed reference — derived from measured model throughput (tokens/sec):
+  A task's estimated_hours = (react_iterations × tokens_per_iter / tok_per_sec) + tool_call_overhead
+
+  Complexity guide based on LLM call count and token volume:
+  - trivial  (2 iters,  ~1k  tokens): 0.1-0.2h  — single-line fix, config change
+  - simple   (4 iters,  ~1.6k tokens): 0.2-0.5h  — small bug fix, 1 file change
+  - medium   (7 iters,  ~2.6k tokens): 0.5-1.5h  — multi-file fix, auth middleware
+  - complex  (12 iters, ~3.8k tokens): 1.5-3h    — full service integration, CI/CD overhaul
+  - large    (20 iters, ~5k  tokens):  3-6h       — test suite for whole service
+
+  These are calculated from real model performance metrics stored per agent.
+  The actual throughput of each agent's model is tracked and updated live.
+
+THEREFORE: timelines are in HOURS, not days.
+  total_timeline_hours: 72-120 hours for a large remediation (not 60 days!)
+  phase duration_hours: typically 4-16 hours per phase
+  task estimated_hours: use the complexity guide above (0.1h to 6h range)
+  start_hour / end_hour: cumulative hours from project kickoff (Hour 0)
 
 ════════════════════════════════════════════════════════════════════
 MISSION
@@ -131,21 +155,21 @@ YOUR TEAM (use these role names VERBATIM when assigning tasks)
 MANDATORY PLAN STRUCTURE  (REJECT criteria if not met)
 ════════════════════════════════════════════════════════════════════
 • MINIMUM 6 phases — plans with fewer phases will be REJECTED
-• MINIMUM 3 tasks per phase — phases with fewer tasks will be REJECTED
-• All phase start_day/end_day values must be sequential with NO gaps
-• All values must sum to total_timeline_days
-• Sprint capacity: {sprint_days} days per sprint, {capacity} capacity factor{security_note}{ux_note}
+• MINIMUM 4 tasks per phase — phases with fewer tasks will be REJECTED
+• All timings are in HOURS — use start_hour, end_hour, duration_hours, estimated_hours
+• Phase start_hour/end_hour must be sequential with NO gaps
+• Hours sum to total_timeline_hours (target: 72-120 hours for large remediations){security_note}{ux_note}
 
-REQUIRED PHASES (adapt names/scope to the actual project goal, but keep all categories):
-  Phase 1  | Discovery & Audit       | Days  1-5   | Reproduce issues, map codebase, categorise bugs
-  Phase 2  | Security & Auth Fixes   | Days  6-12  | OWASP fixes, auth flows, input validation, secrets
-  Phase 3  | Core Backend Fixes      | Days 13-25  | API bugs, DB errors, business logic, data integrity
-  Phase 4  | CI/CD & DevOps          | Days 26-32  | Pipeline fixes, Docker, scripts, deployment config
-  Phase 5  | Frontend & UX           | Days 33-40  | UI bugs, accessibility, design polish, UX flows
-  Phase 6  | Test Automation         | Days 41-48  | Unit+integration+E2E tests, coverage > 70%
-  Phase 7  | Documentation           | Days 49-52  | API docs, runbooks, CHANGELOG, inline comments
-  Phase 8  | Staging & UAT           | Days 53-56  | Full staging deploy, UAT, stakeholder sign-off
-  Phase 9  | Production Rollout      | Days 57-60  | Canary deploy, monitoring, rollback playbook
+REQUIRED PHASES — reference timings (AI agents work in parallel within phases):
+  Phase 1  | Discovery & Audit       | Hour  0-8    | All agents scan & reproduce their issues in parallel
+  Phase 2  | Security & Auth Fixes   | Hour  8-24   | security + developer fix all 7 OWASP issues
+  Phase 3  | Core Backend & Scripts  | Hour 24-48   | developer fixes Category C/D/E issues
+  Phase 4  | CI/CD & DevOps          | Hour 24-40   | devops fixes all 25 Category B issues (runs parallel to Phase 3)
+  Phase 5  | Frontend & UX           | Hour 40-56   | design + ux + ui_test improve UI/accessibility
+  Phase 6  | Test Automation         | Hour 48-72   | qa_auto + api_test write and integrate all tests
+  Phase 7  | Documentation           | Hour 56-64   | docs agent writes runbooks, API docs, CHANGELOG
+  Phase 8  | Staging & UAT           | Hour 72-84   | devops deploys staging, qa + support run UAT
+  Phase 9  | Production Rollout      | Hour 84-96   | devops canary deploy, monitoring, rollback playbook
 
 ════════════════════════════════════════════════════════════════════
 TASK QUALITY REQUIREMENTS (every task MUST have ALL fields)
@@ -175,9 +199,9 @@ priority:
   P1=security/data-loss/system-down, P2=blocks core user flows,
   P3=degraded experience/normal bug, P4=nice-to-have/polish
 
-estimated_days:
-  Be realistic. Quick config fix=0.5 days. Medium bug=1-2 days.
-  Complex feature or security overhaul=3-5 days. Architectural change=5-8 days.
+estimated_hours:
+  AI agent speed: config fix=0.5h, 1-line bug=0.25h, auth fix=2-3h,
+  CI/CD fix=2-4h, shared middleware=3-5h, full test suite=4-8h, docs=1-2h.
 
 ════════════════════════════════════════════════════════════════════
 EXAMPLE OF A PERFECTLY FORMED TASK
@@ -194,7 +218,7 @@ EXAMPLE OF A PERFECTLY FORMED TASK
   "assigned_to": "security",
   "priority": "P1",
   "ticket_type": "Bug",
-  "estimated_days": 2,
+  "estimated_hours": 2,
   "depends_on": "Phase 1: Reproduce and document all OWASP findings"
 }}
 
@@ -277,44 +301,48 @@ A plan with < 6 phases OR < 3 tasks per phase will be automatically REJECTED.
             "Write the FULL PROJECT PLAN in professional markdown.\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
 
+            "IMPORTANT: This is an AI agent team — all timelines are in HOURS, not days.\n"
+            "AI agents work 24/7 simultaneously. The entire remediation should take 72-120 hours.\n\n"
+
             "SECTION 1 — ISSUE TRIAGE & TEAM ASSIGNMENT MATRIX\n"
-            "Before any phases, write a table showing exactly how you split the 1,539 issues:\n"
-            "| Category | Issue Count | Issues (by # or range) | Assigned Agent | Phase | Timeline |\n"
-            "|----------|------------|------------------------|----------------|-------|----------|\n"
+            "Before any phases, write a table showing exactly how you split the issues:\n"
+            "| Category | Issue Count | Issues (by # or range) | Assigned Agent | Phase | Timeline (hours) |\n"
+            "|----------|------------|------------------------|----------------|-------|------------------|\n"
             "Fill this with REAL issue numbers and counts from the audit above.\n"
             "Example rows:\n"
-            "| Category A — Security | 7 | #1,#2,#3,#4,#5,#6,#7 | security + developer | Phase 2 | Day 6-12 |\n"
-            "| Category B — CI/CD | 25 | #8 through #32 | devops | Phase 4 | Day 26-32 |\n"
-            "| Category C — Scripts | 13 | #33 through #45 | developer | Phase 3 | Day 13-25 |\n\n"
+            "| Category A — Security | 7 | #1,#2,#3,#4,#5,#6,#7 | security + developer | Phase 2 | Hour 8-24 |\n"
+            "| Category B — CI/CD | 25 | #8 through #32 | devops | Phase 4 | Hour 24-40 |\n"
+            "| Category C — Scripts | 13 | #33 through #45 | developer | Phase 3 | Hour 24-48 |\n\n"
 
             "SECTION 2 — PER-AGENT WORKLOAD BREAKDOWN\n"
-            "For each agent, write their full workload:\n"
-            "**security agent** — N issues, X days\n"
-            "  - Issue #1: [title] — 1 day (Day 6)\n"
-            "  - Issue #2: [title] — 0.5 days (Day 7)\n"
-            "  [list all issues assigned to this agent with per-issue time]\n\n"
-            "**devops agent** — N issues, X days\n"
+            "For each agent, write their full workload in hours:\n"
+            "**security agent** — N issues, X hours total\n"
+            "  - Issue #1: Rotate hardcoded API key — 2h (Hour 8-10)\n"
+            "  - Issue #2: Enforce JWT auth — 3h (Hour 10-13)\n"
+            "  [list all issues assigned to this agent with per-issue hour estimates]\n\n"
+            "**devops agent** — N issues, X hours total\n"
             "  [same format]\n\n"
-            "**developer agent** — N issues, X days\n"
+            "**developer agent** — N issues, X hours total\n"
             "  [same format]\n\n"
             "[Do this for every agent that has work assigned]\n\n"
 
-            "SECTION 3 — PHASES (minimum 9, all required)\n"
+            "SECTION 3 — PHASES (minimum 9, all required, timings in HOURS)\n"
             "For EACH phase:\n"
-            "  ### Phase N: [Name] (Day X–Y, duration Z days)\n"
+            "  ### Phase N: [Name] (Hour X–Y, duration Z hours)\n"
             "  **Why this phase exists:** [what would go wrong if skipped]\n"
-            "  **Agents working:** [list with their specific role in this phase]\n"
-            "  **Issues resolved in this phase:** #X, #Y, #Z (list the actual issue numbers)\n"
-            "  **How the work happens day by day:**\n"
-            "    Day X: [agent] does [specific action on specific file/issue]\n"
-            "    Day X+1: [agent] does [specific action]\n"
+            "  **Agents working in parallel:** [list with their specific role]\n"
+            "  **Issues resolved in this phase:** #X, #Y, #Z (list actual issue numbers)\n"
+            "  **Hour-by-hour work breakdown:**\n"
+            "    Hour X-X+1: [agent] reads and reproduces [specific file/issue]\n"
+            "    Hour X+1-X+3: [agent] implements fix for issue #N in [specific file:line]\n"
+            "    Hour X+3-X+4: [agent] runs tests, commits, reports to manager\n"
             "  **Tasks (minimum 4 per phase):**\n"
             "  For EACH task:\n"
             "    #### Task: [Imperative verb phrase referencing the specific issue]\n"
             "    - Owner: [role]\n"
             "    - Issues covered: #X, #Y (from the audit list above)\n"
             "    - Priority: P1/P2/P3/P4\n"
-            "    - Estimate: X days\n"
+            "    - Estimate: X hours (e.g. 2h, 0.5h, 4h)\n"
             "    - How to do it: Step-by-step — exact file paths (e.g. scripts/ingest_codebase.py:28),\n"
             "      exact commands (e.g. git filter-branch --tree-filter ...), exact code changes needed\n"
             "    - Acceptance criteria (numbered testable checklist, minimum 4 items):\n"
@@ -323,16 +351,16 @@ A plan with < 6 phases OR < 3 tasks per phase will be automatically REJECTED.
             "      3. [specific behavior check]\n"
             "      4. [code review / CI check]\n\n"
 
-            "REQUIRED PHASES:\n"
-            "  Phase 1: Discovery & Audit (Day 1-5) — reproduce every P1 issue, categorize all 1,539\n"
-            "  Phase 2: Security & Auth Fixes (Day 6-12) — all 7 Category A issues, P1 non-negotiable\n"
-            "  Phase 3: Core Backend & Scripts Fixes (Day 13-25) — all Category C+D+E issues\n"
-            "  Phase 4: CI/CD & DevOps Fixes (Day 26-32) — all 25 Category B issues\n"
-            "  Phase 5: Frontend, UX & Design (Day 33-40) — UI bugs, accessibility, UX flows\n"
-            "  Phase 6: Test Automation & Coverage (Day 41-48) — unit+integration+E2E, coverage ≥70%\n"
-            "  Phase 7: Documentation & Architecture (Day 49-52) — runbooks, API docs, ADRs\n"
-            "  Phase 8: Staging & UAT (Day 53-56) — full staging deploy, UAT, sign-off\n"
-            "  Phase 9: Production Rollout & Monitoring (Day 57-60) — canary deploy, dashboards, playbooks\n\n"
+            "REQUIRED PHASES (AI team, running 24/7 in parallel):\n"
+            "  Phase 1: Discovery & Audit (Hour 0-8) — all agents scan and reproduce their issues in parallel\n"
+            "  Phase 2: Security & Auth Fixes (Hour 8-24) — security + developer fix all 7 Category A issues\n"
+            "  Phase 3: Core Backend & Scripts Fixes (Hour 24-48) — developer fixes Categories C/D/E\n"
+            "  Phase 4: CI/CD & DevOps Fixes (Hour 24-40) — devops fixes all 25 Category B (parallel with Phase 3)\n"
+            "  Phase 5: Frontend, UX & Design (Hour 40-56) — design + ux + ui_test, UI bugs and a11y\n"
+            "  Phase 6: Test Automation & Coverage (Hour 48-72) — qa_auto + api_test, coverage ≥70%\n"
+            "  Phase 7: Documentation (Hour 56-64) — docs agent, runbooks API docs CHANGELOG\n"
+            "  Phase 8: Staging & UAT (Hour 72-84) — devops deploys, qa + support run UAT\n"
+            "  Phase 9: Production Rollout (Hour 84-96) — canary deploy, monitoring, rollback playbook\n\n"
 
             "SECTION 4 — RISKS (minimum 5, each specific to THIS project)\n"
             "For each: what could go wrong, probability, impact, and a concrete action to prevent it.\n\n"
@@ -380,16 +408,18 @@ A plan with < 6 phases OR < 3 tasks per phase will be automatically REJECTED.
             {"role": "user", "content": (
                 "Your plan above is exactly what I need. Now call submit_plan to encode it in JSON.\n\n"
                 "CRITICAL RULES for the JSON:\n"
+                "• ALL timings are in HOURS — use total_timeline_hours, duration_hours, "
+                "start_hour, end_hour, estimated_hours (NOT days)\n"
                 "• Include ALL 9 phases — do not drop any\n"
                 "• MINIMUM 4 tasks per phase (you wrote 4+ in your prose — keep them all)\n"
                 "• In each task's description field: include the EXACT issue numbers from the audit "
                 "(e.g. 'Fixes audit issues #1, #2, #6'), the exact file paths, exact commands, "
-                "and step-by-step how the agent will do the work\n"
+                "and step-by-step how the AI agent will do the work\n"
                 "• In each task's acceptance_criteria field: numbered list with at least 4 "
                 "specific, testable items (test commands, expected outputs, scan results)\n"
                 "• In each phase's objective field: state which issue numbers are resolved, "
-                "which agents work in parallel, and what they report to you at phase end\n"
-                "• Phases must be sequential: start_day and end_day must have no gaps\n"
+                "which agents work in parallel, and what they report at phase end\n"
+                "• Phases can run in parallel — start_hour of Phase 4 can equal start_hour of Phase 3\n"
                 "• Do not simplify or abbreviate anything from your prose plan\n"
                 "• Only the tool call counts — no prose"
             )},
@@ -490,16 +520,33 @@ A plan with < 6 phases OR < 3 tasks per phase will be automatically REJECTED.
             phase_name = phase.get("name", "Phase")
             for task in phase.get("tasks", []):
                 try:
+                    # Support both hours-based (new) and days-based (legacy) timeline fields
+                    start   = phase.get("start_hour",  phase.get("start_day",  "?"))
+                    end     = phase.get("end_hour",    phase.get("end_day",    "?"))
+                    unit    = "h" if "start_hour" in phase else "d"
+                    effort  = task.get("estimated_hours", task.get("estimated_days", "?"))
+                    e_unit  = "hour(s)" if "estimated_hours" in task else "day(s)"
                     description = (
                         f"[Phase: {phase_name}]\n\n"
                         f"{task.get('description', '')}\n\n"
                         f"Phase objective: {phase.get('objective', '')}\n"
-                        f"Timeline: Day {phase.get('start_day')}–{phase.get('end_day')}\n"
-                        f"Estimated effort: {task.get('estimated_days', '?')} day(s)"
+                        f"Timeline: {unit}{start}–{unit}{end}\n"
+                        f"Estimated effort: {effort} {e_unit}"
                     )
                     if task.get("depends_on"):
                         description += f"\n\nDepends on: {task['depends_on']}"
 
+                    # Carry estimated_hours (new) or estimated_days (legacy) into labels
+                    # so the progress monitor can compare actual vs estimated time
+                    est_h = task.get("estimated_hours") or (
+                        task.get("estimated_days", 0) * 8  # 8h/day as fallback
+                    )
+                    phase_slug = phase_name.lower().replace(" ", "_")
+                    labels = (
+                        f"plan:{plan_id},"
+                        f"phase:{phase_slug},"
+                        f"estimated_hours:{est_h}"
+                    )
                     ticket = db_create_task(
                         title               = task.get("title", "Untitled"),
                         description         = description,
@@ -507,7 +554,7 @@ A plan with < 6 phases OR < 3 tasks per phase will be automatically REJECTED.
                         priority            = task.get("priority", settings.planning_default_priority),
                         ticket_type         = task.get("ticket_type", "Task"),
                         acceptance_criteria = task.get("acceptance_criteria", ""),
-                        labels              = f"plan:{plan_id},phase:{phase_name.lower().replace(' ','_')}",
+                        labels              = labels,
                         source              = "manager_plan",
                         created_by          = "manager",
                     )

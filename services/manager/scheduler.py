@@ -412,6 +412,102 @@ async def job_idle_work() -> None:
     log.info(f"  Idle tasks dispatched to {len(idle_roles)} agents")
 
 
+async def job_progress_check() -> None:
+    """
+    Every 15 min — Check in-progress tasks against their estimated_hours benchmark.
+    If an agent is running over their estimate, the manager pings them for a status
+    update and flags it in the log / Teams.
+    """
+    log.info("⏱ Progress check running")
+    all_in_progress = get_tasks(status="in_progress", limit=200)
+    if not all_in_progress:
+        log.debug("No in-progress tasks to check")
+        return
+
+    now = datetime.utcnow()
+    overdue: list[dict] = []
+    on_track: list[dict] = []
+
+    for task in all_in_progress:
+        # Parse estimated_hours from task labels (stored as "estimated_hours:X")
+        labels = task.get("labels", "") or ""
+        est_hours: float | None = None
+        for lbl in labels.split(","):
+            lbl = lbl.strip()
+            if lbl.startswith("estimated_hours:"):
+                try:
+                    est_hours = float(lbl.split(":", 1)[1])
+                except ValueError:
+                    pass
+                break
+
+        if est_hours is None:
+            continue  # no benchmark set — skip
+
+        # Use created_at as proxy for task start (tasks dispatched immediately on creation)
+        created_raw = task.get("created_at")
+        if not created_raw:
+            continue
+        try:
+            created = datetime.fromisoformat(
+                str(created_raw).replace("Z", "").split("+")[0]
+            )
+            elapsed_hours = (now - created).total_seconds() / 3600
+        except Exception:
+            continue
+
+        pct_used = (elapsed_hours / est_hours) * 100 if est_hours > 0 else 0
+
+        if pct_used >= 120:          # 20% over estimate
+            overdue.append({**task, "elapsed_hours": elapsed_hours, "est_hours": est_hours, "pct": pct_used})
+        elif pct_used >= 80:         # 80-120% — approaching deadline
+            on_track.append({**task, "elapsed_hours": elapsed_hours, "est_hours": est_hours, "pct": pct_used})
+
+    # ── Ping overdue agents ────────────────────────────────────────────────────
+    if overdue:
+        lines = [f"⚠️ **Progress Alert** — {len(overdue)} task(s) past estimated hours:\n"]
+
+        async def ping_agent(task_info: dict) -> None:
+            role = task_info.get("assigned_to", "developer")
+            elapsed = round(task_info["elapsed_hours"], 1)
+            est     = task_info["est_hours"]
+            ticket  = task_info.get("ticket_id", "?")
+            title   = task_info.get("title", "?")[:60]
+            pct     = round(task_info["pct"])
+            log.warning(
+                f"  [{role}] {ticket} — {elapsed}h elapsed vs {est}h estimate ({pct}% used): {title}"
+            )
+            status_update = await _ask_agent(
+                role,
+                f"MANAGER CHECK-IN: Task {ticket} '{title}' was estimated at {est}h "
+                f"but you've been working on it for {elapsed}h ({pct}% of estimate). "
+                f"Give me a quick status update:\n"
+                f"1. What percentage complete are you?\n"
+                f"2. What's blocking you (if anything)?\n"
+                f"3. What's your updated time estimate to finish?\n"
+                f"Be honest and direct.",
+                timeout=60,
+            )
+            lines.append(
+                f"- **[{role}]** {ticket} — {elapsed}h / {est}h ({pct}%): {title}\n"
+                f"  Status: {status_update[:200]}"
+            )
+
+        await asyncio.gather(*[ping_agent(t) for t in overdue], return_exceptions=True)
+        msg = "\n".join(lines)
+        log.warning(msg)
+        await _post_to_teams(msg)
+
+    # ── Log approaching tasks (no ping, just log) ─────────────────────────────
+    if on_track:
+        for t in on_track:
+            log.info(
+                f"  [{t.get('assigned_to')}] {t.get('ticket_id')} approaching deadline: "
+                f"{round(t['elapsed_hours'], 1)}h / {t['est_hours']}h "
+                f"({round(t['pct'])}%) — {t.get('title','')[:50]}"
+            )
+
+
 async def job_health_check() -> None:
     """Every 5 min — Verify all agent services are reachable."""
     down = []
@@ -487,6 +583,13 @@ def create_scheduler() -> AsyncIOScheduler:
         IntervalTrigger(minutes=20),
         id="idle_work",
         name="Idle Agent Learning Tasks",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        job_progress_check,
+        IntervalTrigger(minutes=15),
+        id="progress_check",
+        name="Task Progress vs Estimated Hours",
         replace_existing=True,
     )
 

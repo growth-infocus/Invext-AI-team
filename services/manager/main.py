@@ -244,5 +244,53 @@ async def scheduler_jobs():
             {"id": "weekly_report",   "schedule": "Monday 09:00 UTC", "description": "Weekly recap to Teams + email"},
             {"id": "health_check",    "schedule": "Every 5 minutes",  "description": "Verify all 12 agents reachable"},
             {"id": "idle_work",       "schedule": "Every 20 minutes", "description": "Give learning/maintenance tasks to idle agents"},
+            {"id": "progress_check",  "schedule": "Every 15 minutes", "description": "Check tasks vs estimated hours; ping overdue agents"},
         ]
     }
+
+
+@app.get("/metrics/models", summary="Real-time model throughput (tokens/sec, latency) per model")
+async def model_metrics():
+    """
+    Returns measured LLM performance per model — rolling average of last 50 calls.
+    Used by the planner to calculate realistic agent task estimates.
+    """
+    from shared.core.llm import get_model_metrics
+    from shared.core.config import settings as cfg
+
+    models = list({
+        cfg.openai_default_model,
+        cfg.openai_planning_model,
+        cfg.groq_default_model,
+        cfg.groq_tool_model,
+        cfg.openrouter_default_model,
+        cfg.gemini_default_model,
+    })
+    results = {}
+    for m in models:
+        data = await get_model_metrics(m)
+        if data:
+            results[m] = data
+
+    return {
+        "models": results,
+        "note": "Rolling avg of last 50 LLM calls per model. Used for task time estimation."
+    }
+
+
+@app.get("/metrics/estimates", summary="Estimated task hours per agent role based on real model throughput")
+async def task_estimates():
+    """
+    Returns expected task duration for each agent role at each complexity level.
+    Calculated from real measured model throughput.
+    """
+    from shared.core.llm import estimate_task_hours
+    roles = ["developer", "devops", "qa", "security", "docs", "design",
+             "ux", "ui_test", "api_test", "qa_auto", "support"]
+    complexities = ["trivial", "simple", "medium", "complex", "large"]
+    results = {}
+    for role in roles:
+        results[role] = {}
+        for c in complexities:
+            results[role][c] = await estimate_task_hours(role, c)
+    return {"estimates_hours": results}

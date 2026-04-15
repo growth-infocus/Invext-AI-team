@@ -38,22 +38,22 @@ _SUBMIT_PLAN_SCHEMA = make_schema(
             "type": "string",
             "description": "1-3 sentence executive summary of what this project achieves"
         },
-        "total_timeline_days": {
-            "type": "integer",
-            "description": "Total calendar days from kickoff to production-ready"
+        "total_timeline_hours": {
+            "type": "number",
+            "description": "Total wall-clock hours from kickoff to production-ready. AI agents work 24/7 in parallel — most full remediations complete in 48-120 hours."
         },
         "phases": {
             "type": "array",
-            "description": "Ordered delivery phases (Discovery → Design → Dev → QA → DevOps → Launch)",
+            "description": "Ordered delivery phases. All timings are in HOURS (not days). AI agents run 24/7.",
             "items": {
                 "type": "object",
                 "properties": {
-                    "name":          {"type": "string"},
-                    "order":         {"type": "integer"},
-                    "duration_days": {"type": "integer"},
-                    "start_day":     {"type": "integer"},
-                    "end_day":       {"type": "integer"},
-                    "objective":     {"type": "string"},
+                    "name":           {"type": "string"},
+                    "order":          {"type": "integer"},
+                    "duration_hours": {"type": "number", "description": "Phase duration in hours"},
+                    "start_hour":     {"type": "number", "description": "Hour offset from project start (Hour 0 = kickoff)"},
+                    "end_hour":       {"type": "number", "description": "Hour offset when phase completes"},
+                    "objective":      {"type": "string"},
                     "assigned_roles": {
                         "type": "array",
                         "items": {"type": "string",
@@ -71,14 +71,14 @@ _SUBMIT_PLAN_SCHEMA = make_schema(
                                 "assigned_to":         {"type": "string"},
                                 "priority":            {"type": "string", "enum": ["P1","P2","P3","P4"]},
                                 "ticket_type":         {"type": "string", "enum": ["Task","Bug","Story","Epic","Spike"]},
-                                "estimated_days":      {"type": "number"},
+                                "estimated_hours":     {"type": "number", "description": "Estimated hours for an AI agent to complete this task"},
                                 "depends_on":          {"type": "string", "description": "Title of blocking task (if any)"}
                             },
-                            "required": ["title","description","acceptance_criteria","assigned_to","priority","estimated_days"]
+                            "required": ["title","description","acceptance_criteria","assigned_to","priority","estimated_hours"]
                         }
                     }
                 },
-                "required": ["name","order","duration_days","start_day","end_day","objective","tasks"]
+                "required": ["name","order","duration_hours","start_hour","end_hour","objective","tasks"]
             }
         },
         "deliverables": {
@@ -120,7 +120,7 @@ _SUBMIT_PLAN_SCHEMA = make_schema(
             "description": "Any stack-specific constraints, upgrade needs, or architectural decisions"
         }
     },
-    required=["project_name","goal_summary","total_timeline_days","phases",
+    required=["project_name","goal_summary","total_timeline_hours","phases",
                "deliverables","testing_scope","risks","definition_of_done"]
 )
 
@@ -128,12 +128,13 @@ _SUBMIT_PLAN_SCHEMA = make_schema(
 async def _submit_plan_executor(args: dict) -> str:
     """Stores the plan temporarily in a module-level dict keyed by a sentinel."""
     _pending_plans["latest"] = args
-    task_count = sum(len(p.get("tasks", [])) for p in args.get("phases", []))
+    task_count  = sum(len(p.get("tasks", [])) for p in args.get("phases", []))
     phase_count = len(args.get("phases", []))
+    hours       = args.get("total_timeline_hours", "?")
     return (
         f"Plan '{args.get('project_name')}' accepted. "
         f"{phase_count} phases, {task_count} tasks, "
-        f"{args.get('total_timeline_days')} days total."
+        f"{hours} hours total (~{round(float(hours)/24, 1) if hours != '?' else '?'} days wall-clock)."
     )
 
 
