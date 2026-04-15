@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
     curl \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Working directory
@@ -22,11 +23,18 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy entire project (shared/ + services/)
 COPY . .
 
-# Create sandbox and reports directories
-RUN mkdir -p /app/sandbox /app/reports
+# Create sandbox, reports, and workspace mount point
+RUN mkdir -p /app/sandbox /app/reports /workspace
 
-# Create non-root user for security
-RUN useradd -m -u 1000 agentuser && chown -R agentuser:agentuser /app
+# Create non-root user; give ownership of app + workspace mount point
+RUN useradd -m -u 1000 agentuser \
+    && chown -R agentuser:agentuser /app /workspace
+
+# Configure git identity for commits made by agents
+RUN git config --system user.name "Invext AI Agent" \
+    && git config --system user.email "agents@invext.ai" \
+    && git config --system safe.directory '*'
+
 USER agentuser
 
 # PYTHONPATH so `from shared.core import ...` resolves

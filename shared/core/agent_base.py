@@ -131,7 +131,10 @@ class BaseAgent(ABC):
     provider: str = "openrouter"
     model: Optional[str] = None
     tool_model: Optional[str] = None
-    required_tools: list[str] = []
+    required_tools: list[str] = [
+        "workspace_read", "workspace_write", "workspace_patch",
+        "workspace_list", "workspace_bash", "workspace_git",
+    ]
 
     def __init__(self):
         self.memory = _get_memory_backend(self.role)
@@ -147,6 +150,34 @@ class BaseAgent(ABC):
     @property
     @abstractmethod
     def system_prompt(self) -> str: ...
+
+    @property
+    def workspace_context(self) -> str:
+        """Appended to every agent's system prompt so they know how to use workspace tools."""
+        import os
+        workspace = os.environ.get("WORKSPACE_DIR", "/workspace")
+        return f"""
+
+=== WORKSPACE ACCESS ===
+The client codebase is mounted at {workspace}.
+You have direct access to it via these tools:
+  workspace_read  path             — read any file (relative to {workspace})
+  workspace_write path content     — write/overwrite a file
+  workspace_patch path old new     — targeted string replacement (preferred for edits)
+  workspace_list  path pattern     — list files
+  workspace_bash  cmd              — run any shell command (grep, pytest, pip, etc.)
+  workspace_git   args             — run git commands (status, diff, add, commit, push)
+
+ACCOUNTABILITY WORKFLOW — you MUST follow this for every fix:
+  1. REPRODUCE  — use workspace_bash to confirm the bug exists (grep, read, run tests)
+  2. CONFIRM    — use workspace_read to read the exact file and understand root cause
+  3. FIX        — use workspace_patch or workspace_write to apply the fix
+  4. VERIFY     — use workspace_bash to run affected tests or re-check the condition
+  5. COMMIT     — use workspace_git to stage and commit: git add <file> && git commit -m "fix: ..."
+  6. REPORT     — include evidence at every step in your task result
+
+Never skip steps. Each step must have evidence.
+"""
 
     @property
     def tools(self) -> list[dict]:
@@ -302,7 +333,7 @@ class BaseAgent(ABC):
 
         messages = [
             {"role": "system", "content": (
-                f"{self.system_prompt}{skills_text}\n\n"
+                f"{self.system_prompt}{self.workspace_context}{skills_text}\n\n"
                 "You have just been assigned a task. Before starting, submit a detailed work plan "
                 "to your manager for approval. Call submit_work_plan with your plan now.\n"
                 "Be specific: exact steps, tools, deliverables, hours, and any questions/blockers."
@@ -368,7 +399,7 @@ class BaseAgent(ABC):
 
         messages = [
             {"role": "system", "content": (
-                f"{self.system_prompt}{skills_text}\n\n"
+                f"{self.system_prompt}{self.workspace_context}{skills_text}\n\n"
                 "Your manager has reviewed your work plan and rejected it. "
                 "Read the feedback carefully, address every point, and submit a revised work plan. "
                 "Call submit_work_plan with the updated plan."
@@ -496,7 +527,7 @@ class BaseAgent(ABC):
         mem_context = await self.memory.recall(task["title"] + " " + task.get("description", ""))
         skills      = await self.memory.get_skills()
         skills_text = ("\nYour skills:\n" + "\n".join(f"• {s}" for s in skills)) if skills else ""
-        messages = [{"role": "system", "content": self.system_prompt + skills_text}]
+        messages = [{"role": "system", "content": self.system_prompt + self.workspace_context + skills_text}]
         if mem_context:
             messages.append({"role": "system", "content": mem_context})
         messages.append({"role": "user", "content": f"Your goal:\n{goal}"})

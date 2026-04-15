@@ -16,6 +16,10 @@ x-agent-base: &agent-base
     - reports_vol:/app/reports
     - sandbox_vol:/app/sandbox
     - obsidian_vault:/app/obsidian_vault
+    # Mount client workspace so agents can read/write/run/commit code
+    - /Users/sonadarshan/GIFT_REPOS/GIFTX-TRADEPILOT:/workspace:rw
+    # SSH keys so agents can git push
+    - /Users/sonadarshan/.ssh:/home/agentuser/.ssh:ro
   depends_on:
     redis:
       condition: service_healthy
@@ -26,6 +30,7 @@ x-agent-base: &agent-base
     - agent-net
   environment:
     OBSIDIAN_VAULT_PATH: /app/obsidian_vault
+    WORKSPACE_DIR: /workspace
 
 services:
 
