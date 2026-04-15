@@ -8,8 +8,10 @@ class Settings(BaseSettings):
     service_port: int = 8000
 
     # ── OpenAI ────────────────────────────────────────────────────────────────
-    openai_api_key:       str = ""
-    openai_default_model: str = "gpt-4o-mini"
+    openai_api_key:        str = ""
+    openai_default_model:  str = "gpt-4o-mini"
+    # Dedicated model for complex planning — use gpt-4o for best plan quality
+    openai_planning_model: str = "gpt-4o"
 
     # ── OpenRouter ────────────────────────────────────────────────────────────
     openrouter_api_key:           str = ""

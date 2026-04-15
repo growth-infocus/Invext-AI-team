@@ -82,9 +82,28 @@ Core principles:
             if settings.planning_include_ux_phase else ""
         )
 
-        return f"""You are the most experienced Chief Technology Officer and Engineering Manager alive.
-You have 30+ years delivering mission-critical software. Your plans are legendary for their precision,
-completeness, and realism. Real engineers will execute this plan starting tomorrow. Today: {today}
+        return f"""You are a battle-hardened Engineering Director with 25 years of experience leading
+engineering teams through crises, product launches, and large-scale remediation efforts.
+You've seen systems with 2,000+ bugs and you know exactly how to triage, plan, and execute.
+When a report like this lands on your desk, you don't panic — you get organized, get specific,
+and get your team moving with complete clarity on what to do, who owns it, and when it's due.
+Today is {today}. This plan starts tomorrow.
+
+Your voice as a manager is direct, authoritative, and specific. You speak to your team like a
+real leader: "Security team — I need all OWASP A01-A10 findings triaged and the top 3 fixed
+by end of Phase 2. No exceptions. I will be reviewing your work plan before you touch any code."
+
+You know that 1,500+ issues fall into clusters, and clusters have clear owners:
+• Security vulnerabilities → security agent owns them, P1, non-negotiable timeline
+• CI/CD pipeline failures → devops agent owns them, they block everything else
+• Auth/API bugs → developer agent, these block all user-facing features
+• Test coverage gaps → qa_auto agent, these must be closed before any release
+• Documentation debt → docs agent, runs in parallel with fixes
+• UI/UX issues → design + ux + ui_test agents, parallel track
+
+You plan in PHASES with REAL CALENDAR DATES, specific owners, and measurable outcomes.
+You demand testable acceptance criteria — not "it works" but "running X test produces Y result".
+You call out risks before they hit and you have mitigations ready.
 
 ════════════════════════════════════════════════════════════════════
 MISSION
@@ -217,9 +236,10 @@ A plan with < 6 phases OR < 3 tasks per phase will be automatically REJECTED.
         project_source: Optional[str] = None,
     ) -> dict:
         """
-        Generates a ProjectPlan via LLM using submit_plan tool.
-        Returns the saved plan dict (status='pending_approval').
-        No tickets are created here.
+        Generates a ProjectPlan via LLM using a 2-turn strategy:
+          Turn 1 — Free-text plan (no tool forcing) → model writes a full, rich plan in prose.
+          Turn 2 — Structured conversion → model reformats its own prose into the submit_plan call.
+        Returns the saved plan dict (status='pending_approval'). No tickets are created here.
         """
         from shared.core.tool_registry import ToolRegistry
 
@@ -235,61 +255,119 @@ A plan with < 6 phases OR < 3 tasks per phase will be automatically REJECTED.
         # Step 2: memory context
         mem_context = await self.memory.recall(goal)
 
-        # Step 3: build prompt — cap goal + scan to avoid overflowing output tokens
-        GOAL_CAP = 8000   # chars; ~2000 tokens — enough for a full audit summary
-        SCAN_CAP = 3000
-        goal_trimmed = goal[:GOAL_CAP] + (" …[truncated — more issues exist]" if len(goal) > GOAL_CAP else "")
+        # Step 3: build inputs — cap goal + scan
+        GOAL_CAP = 8000
+        SCAN_CAP = 2500
+        goal_trimmed = goal[:GOAL_CAP] + (" …[truncated]" if len(goal) > GOAL_CAP else "")
         scan_trimmed = (scan_context[:SCAN_CAP] + " …[truncated]"
                         if len(scan_context) > SCAN_CAP else scan_context)
 
-        user_content = f"PROJECT GOAL AND ISSUE LIST:\n{goal_trimmed}"
+        base_context = f"PROJECT GOAL AND ISSUE LIST:\n{goal_trimmed}"
         if scan_trimmed:
-            user_content += scan_trimmed
+            base_context += scan_trimmed
         if mem_context:
-            user_content += f"\n\nRELEVANT MEMORY:\n{str(mem_context)[:1000]}"
-        user_content += (
+            base_context += f"\n\nRELEVANT MEMORY:\n{str(mem_context)[:800]}"
+
+        # ── TURN 1: Free-text plan ────────────────────────────────────────────
+        # Ask the model to write the complete plan in rich markdown — no tool forcing.
+        # Models generate FAR more content in free text than in tool-call JSON.
+        turn1_user = base_context + (
             "\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            "NOW: Call submit_plan with the COMPLETE plan.\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            "Requirements:\n"
-            "• MINIMUM 6 phases (Discovery → Security → Backend → DevOps → Frontend → QA → Docs → UAT → Deploy)\n"
-            "• MINIMUM 3 tasks per phase — each task needs a specific engineer, real deadline, and testable acceptance criteria\n"
-            "• Every task description must tell the engineer EXACTLY what file/code to change and HOW\n"
-            "• Phases must have sequential start_day/end_day with no gaps\n"
-            "• At least 5 risks with concrete mitigations\n"
-            "• Strict definition_of_done checklist\n\n"
-            "Do NOT write prose. Only the submit_plan tool call counts."
+            "Write a COMPLETE, DETAILED project plan in professional markdown.\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Structure your plan with ALL of these sections:\n\n"
+            "## Project Overview\n"
+            "- Project name, executive summary, total timeline (60 days)\n\n"
+            "## Phases (MINIMUM 9 phases, each with start day and end day)\n"
+            "For EACH phase write:\n"
+            "  ### Phase N: [Name] (Day X – Day Y)\n"
+            "  **Objective:** What the team achieves, HOW each role contributes\n"
+            "  **Assigned Roles:** [list]\n"
+            "  **Tasks:**\n"
+            "  For EACH task (minimum 4 per phase):\n"
+            "    - **Title:** [imperative verb phrase]\n"
+            "    - **Owner:** [one role from: developer/devops/qa/security/docs/design/ux/ui_test/api_test/qa_auto/support]\n"
+            "    - **Priority:** P1/P2/P3/P4\n"
+            "    - **Estimate:** X days\n"
+            "    - **Description:** Exact file paths, specific commands, step-by-step approach\n"
+            "    - **Acceptance Criteria:** Numbered, testable checklist (min 3 items)\n\n"
+            "Required phases: Discovery & Audit | Security & Auth Fixes | Core Backend Fixes | "
+            "CI/CD & DevOps | Frontend & UX | Test Automation | Documentation | Staging & UAT | Production Rollout\n\n"
+            "## Risks (minimum 5)\n"
+            "For each: description, probability (Low/Medium/High), impact (Low/Medium/High), concrete mitigation\n\n"
+            "## Deliverables\n"
+            "List every tangible output\n\n"
+            "## Definition of Done\n"
+            "Strict numbered checklist — every item must be verifiable\n\n"
+            "Write the FULL plan. Do not abbreviate or use placeholders."
         )
 
-        messages = [
+        turn1_msgs = [
             {"role": "system", "content": self.planning_system_prompt},
-            {"role": "user",   "content": user_content},
+            {"role": "user",   "content": turn1_user},
         ]
 
-        # Step 4: call LLM — force it to call submit_plan (up to 2 attempts)
+        # Use the most capable planning model — gpt-4o when provider is openai
+        plan_model = (
+            settings.openai_planning_model
+            if self.provider == "openai"
+            else (self.tool_model or self.model)
+        )
+        log.info(f"[manager] Turn 1: generating free-text plan (model={plan_model})...")
+        prose_response = await call_llm(
+            messages=turn1_msgs,
+            provider=self.provider,
+            model=plan_model,
+            temperature=0.3,
+            max_tokens=8000,
+        )
+        plan_prose = (prose_response.get("content") or "").strip()
+        log.info(f"[manager] Turn 1 prose length: {len(plan_prose)} chars")
+
+        if len(plan_prose) < 500:
+            log.warning("[manager] Turn 1 produced very little prose — proceeding anyway")
+
+        # ── TURN 2: Structured tool call (submit_plan) ────────────────────────
+        # Feed the prose back and ask the model to convert it to the tool call.
+        # The model can now "copy" from its own detailed plan — much higher quality.
+        turn2_msgs = turn1_msgs + [
+            {"role": "assistant", "content": plan_prose},
+            {"role": "user", "content": (
+                "Excellent — your plan above is comprehensive. "
+                "Now call submit_plan with the EXACT SAME plan converted to structured JSON.\n\n"
+                "RULES:\n"
+                "• Include ALL phases from your plan above (minimum 6, ideally 9)\n"
+                "• Include ALL tasks from each phase (minimum 3 per phase)\n"
+                "• Fill in every field: title, description, acceptance_criteria, "
+                "assigned_to, priority, ticket_type, estimated_days\n"
+                "• Phases must have sequential start_day/end_day — no gaps, no overlaps\n"
+                "• Do not omit any phase or task from your prose plan\n"
+                "• Do not write any additional prose — only the tool call"
+            )},
+        ]
+
         plan_schemas = ToolRegistry.get_schemas(*self._plan_tools)
-        plan_data    = None
+        plan_data = None
 
         for attempt in range(2):
             response = await call_llm(
-                messages=messages,
+                messages=turn2_msgs,
                 provider=self.provider,
-                model=self.tool_model or self.model,
+                model=plan_model,
                 tools=plan_schemas,
-                temperature=0.2,
+                temperature=0.1,
                 max_tokens=16000,
                 tool_choice={"type": "function", "function": {"name": "submit_plan"}},
             )
             log.info(
-                f"[manager] plan attempt {attempt+1}: "
+                f"[manager] Turn 2 attempt {attempt+1}: "
                 f"tool_calls={len(response.get('tool_calls') or [])}, "
                 f"content_len={len(response.get('content') or '')}"
             )
 
-            # Step 5: execute tool calls
             for tc in (response.get("tool_calls") or []):
-                fn   = tc["function"]["name"]
-                raw  = tc["function"].get("arguments", "{}") or "{}"
+                fn  = tc["function"]["name"]
+                raw = tc["function"].get("arguments", "{}") or "{}"
                 try:
                     args = json.loads(raw)
                 except json.JSONDecodeError:
@@ -300,28 +378,29 @@ A plan with < 6 phases OR < 3 tasks per phase will be automatically REJECTED.
 
             plan_data = get_pending_plan()
             if plan_data:
-                break
+                n_phases = len(plan_data.get("phases", []))
+                log.info(f"[manager] plan submitted with {n_phases} phases")
+                if n_phases >= 3:
+                    break
+                # If still too few phases, expand on retry
+                log.warning(f"[manager] only {n_phases} phases — retrying with expansion prompt")
+                plan_data = None
 
-            # Retry — keep the FULL quality system prompt, just shorten the user message
             if attempt == 0:
-                log.warning("[manager] submit_plan not called — retrying with direct user message")
-                messages = [
-                    {"role": "system", "content": self.planning_system_prompt},
-                    {"role": "user", "content": (
-                        f"PROJECT GOAL:\n{goal[:1500]}\n\n"
-                        "CALL submit_plan NOW. Minimum 6 phases, minimum 3 tasks per phase. "
-                        "Fill every required field: title, description, acceptance_criteria, "
-                        "assigned_to, priority, estimated_days. "
-                        "Do not write prose. Only the tool call counts."
-                    )},
-                ]
+                # On retry: give model the prose again with stronger expansion instruction
+                turn2_msgs.append({"role": "assistant", "content": response.get("content") or ""})
+                turn2_msgs.append({"role": "user", "content": (
+                    "Your JSON plan is incomplete — it has fewer than 6 phases. "
+                    "Your prose plan above has 9 phases. Call submit_plan again with ALL 9 phases. "
+                    "Include every single phase and every task. Do not truncate."
+                )})
 
         # Step 6: retrieve the submitted plan
         if not plan_data:
-            log.error("[manager] submit_plan was not called after 2 attempts")
+            log.error("[manager] submit_plan was not called after all attempts")
             return {
-                "error": "LLM did not call submit_plan after 2 attempts. Please try again.",
-                "raw_response": (response.get("content") or "")[:800],
+                "error": "LLM did not produce a complete plan after all attempts. Please try again.",
+                "plan_prose": plan_prose[:500],
             }
 
         # Step 7: persist
@@ -331,10 +410,13 @@ A plan with < 6 phases OR < 3 tasks per phase will be automatically REJECTED.
         plan_data["source_url"] = project_source or ""
         save_plan(plan_id, plan_data)
 
+        n_phases = len(plan_data.get("phases", []))
+        n_tasks  = sum(len(p.get("tasks", [])) for p in plan_data.get("phases", []))
         await self.memory.remember(
-            f"Created plan '{plan_data.get('project_name')}' ({plan_id}): {goal[:100]}"
+            f"Created plan '{plan_data.get('project_name')}' ({plan_id}): "
+            f"{n_phases} phases, {n_tasks} tasks — {goal[:80]}"
         )
-        log.info(f"[manager] Plan saved: {plan_id}")
+        log.info(f"[manager] Plan saved: {plan_id} ({n_phases} phases, {n_tasks} tasks)")
         return load_plan(plan_id)
 
     # ── Phase 2: Execute an approved plan → create tickets ───────────────────
