@@ -13,7 +13,7 @@ agent = SecurityAgent()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_schema(); register_all(); await agent.startup()
-    asyncio.create_task(agent.listen())
+    agent.spawn_workers()
     log.info("SecurityAgent ready :8012"); yield
 
 app = FastAPI(title="SecurityAgent :8012", lifespan=lifespan)

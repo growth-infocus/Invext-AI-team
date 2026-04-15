@@ -13,7 +13,7 @@ agent = APITestAgent()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_schema(); register_all(); await agent.startup()
-    asyncio.create_task(agent.listen())
+    agent.spawn_workers()
     log.info("APITestAgent ready :8010"); yield
 
 app = FastAPI(title="APITestAgent :8010", lifespan=lifespan)

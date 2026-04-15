@@ -13,7 +13,7 @@ agent = UITestAgent()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_schema(); register_all(); await agent.startup()
-    asyncio.create_task(agent.listen())
+    agent.spawn_workers()
     log.info("UITestAgent ready :8009"); yield
 
 app = FastAPI(title="UITestAgent :8009", lifespan=lifespan)

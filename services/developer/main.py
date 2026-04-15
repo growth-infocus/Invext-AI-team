@@ -13,7 +13,7 @@ agent = DeveloperAgent()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_schema(); register_all(); await agent.startup()
-    asyncio.create_task(agent.listen())
+    agent.spawn_workers()
     log.info("DeveloperAgent ready :8002"); yield
 
 app = FastAPI(title="DeveloperAgent :8002", lifespan=lifespan)

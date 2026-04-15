@@ -13,7 +13,7 @@ agent = DocsAgent()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_schema(); register_all(); await agent.startup()
-    asyncio.create_task(agent.listen())
+    agent.spawn_workers()
     log.info("DocsAgent ready :8006"); yield
 
 app = FastAPI(title="DocsAgent :8006", lifespan=lifespan)

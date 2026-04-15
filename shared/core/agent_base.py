@@ -185,23 +185,51 @@ Never skip steps. Each step must have evidence.
 
     # ── Startup ───────────────────────────────────────────────────────────────
 
+    def worker_count(self) -> int:
+        """Return the configured number of parallel task workers for this role."""
+        role_key = f"{self.role}_workers"
+        count = getattr(settings, role_key, None)
+        if count is not None:
+            return int(count)
+        return int(settings.agent_worker_concurrency)
+
     async def startup(self):
         await self.memory.connect()
         skills = ROLE_SKILLS.get(self.role, [])
         await self.memory.load_skills(skills)
         await bus.connect()
-        log.info(f"[{self.role}] Agent ready | tools={self.required_tools}")
+        n = self.worker_count()
+        log.info(f"[{self.role}] Agent ready | workers={n} | tools={self.required_tools}")
+
+    def spawn_workers(self) -> list:
+        """
+        Create asyncio tasks for all parallel workers.
+        Call this instead of asyncio.create_task(agent.listen()) in main.py.
+        Returns the list of tasks (for shutdown handling if needed).
+        """
+        n = self.worker_count()
+        tasks = [asyncio.create_task(self.listen(worker_index=i)) for i in range(n)]
+        log.info(f"[{self.role}] Spawned {n} worker(s)")
+        return tasks
 
     # ── Main loop ─────────────────────────────────────────────────────────────
 
-    async def listen(self):
+    async def listen(self, worker_index: int = 0):
+        """
+        Main consumer loop. worker_index makes the consumer name unique so
+        multiple instances of the same agent (same container OR separate containers)
+        can all pull from the same Redis Stream consumer group without conflicts.
+        """
+        import socket
+        hostname  = socket.gethostname()   # unique per Docker container
+        consumer  = f"{self.role}-{hostname}-w{worker_index}"
         self._running = True
-        log.info(f"[{self.role}] Listening for tasks…")
-        async for msg_id, payload in bus.consume(self.role):
+        log.info(f"[{self.role}] Worker {consumer} listening…")
+        async for msg_id, payload in bus.consume(self.role, consumer=consumer):
             task_id = payload.get("task_id")
             if not task_id:
                 continue
-            log.info(f"[{self.role}] Received task {payload.get('ticket_id','?')}")
+            log.info(f"[{self.role}/{consumer}] Received task {payload.get('ticket_id','?')}")
             asyncio.create_task(self._handle_task(task_id))
 
     async def _handle_task(self, task_id: str):

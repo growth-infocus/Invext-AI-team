@@ -75,11 +75,13 @@ class MessageBus:
     ) -> AsyncGenerator[dict, None]:
         """
         Async generator — yields payload dicts from the stream.
-        Uses consumer groups so only one replica processes each message.
+        Uses consumer groups so only one instance processes each message.
+        Pass a unique consumer name per container/worker for horizontal scaling.
         """
+        import socket
         key      = stream_key(role)
         group    = group    or f"group:{role}"
-        consumer = consumer or f"worker:{role}-1"
+        consumer = consumer or f"worker:{role}-{socket.gethostname()}"
 
         # Create stream + group if they don't exist
         try:

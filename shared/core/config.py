@@ -128,6 +128,20 @@ class Settings(BaseSettings):
     # Max steps in a single ReAct loop per agent
     agent_max_react_steps:           int   = 15
 
+    # Number of parallel task workers per agent container.
+    # Each worker is a separate Redis Stream consumer, enabling the same
+    # container to process multiple tickets simultaneously.
+    # Increase for high-workload roles (developer, devops, qa_auto).
+    # Rule of thumb: set to (number_of_tasks_in_phase / phase_duration_multiplier)
+    agent_worker_concurrency:        int   = 1   # override per-role with {ROLE}_WORKER_CONCURRENCY
+
+    # Per-role worker counts (override agent_worker_concurrency for specific roles)
+    developer_workers:  int = 3   # handles most backend tasks — run 3 in parallel
+    devops_workers:     int = 2   # CI/CD + infra tasks
+    qa_auto_workers:    int = 2   # test writing
+    security_workers:   int = 2   # OWASP + CVE scanning
+    docs_workers:       int = 2   # documentation generation
+
     # ── Security ─────────────────────────────────────────────────────────────
     api_secret_key: str = ""
 

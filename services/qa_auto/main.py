@@ -13,7 +13,7 @@ agent = QAAutoAgent()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_schema(); register_all(); await agent.startup()
-    asyncio.create_task(agent.listen())
+    agent.spawn_workers()
     log.info("QAAutoAgent ready :8011"); yield
 
 app = FastAPI(title="QAAutoAgent :8011", lifespan=lifespan)

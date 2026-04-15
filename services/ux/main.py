@@ -13,7 +13,7 @@ agent = UXAgent()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_schema(); register_all(); await agent.startup()
-    asyncio.create_task(agent.listen())
+    agent.spawn_workers()
     log.info("UXAgent ready :8008"); yield
 
 app = FastAPI(title="UXAgent :8008", lifespan=lifespan)

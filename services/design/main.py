@@ -13,7 +13,7 @@ agent = DesignAgent()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_schema(); register_all(); await agent.startup()
-    asyncio.create_task(agent.listen())
+    agent.spawn_workers()
     log.info("DesignAgent ready :8007"); yield
 
 app = FastAPI(title="DesignAgent :8007", lifespan=lifespan)
